@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -66,6 +67,21 @@ fun NotConfiguredScreen() = Page {
             "SUPABASE_URL aur SUPABASE_ANON_KEY daalo, phir app dobara build karo.",
         textAlign = TextAlign.Center,
     )
+}
+
+@Composable
+fun UpdateRequiredScreen(onUpdate: () -> Unit) = Page {
+    Icon(Icons.Filled.SystemUpdate, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp))
+    Spacer(Modifier.height(16.dp))
+    Text("Naya version aa gaya hai", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+    Spacer(Modifier.height(8.dp))
+    Text(
+        "Aage badhne ke liye pehle app update karo.",
+        textAlign = TextAlign.Center,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Spacer(Modifier.height(20.dp))
+    Button(onClick = onUpdate, modifier = Modifier.fillMaxWidth()) { Text("Update karo") }
 }
 
 @Composable

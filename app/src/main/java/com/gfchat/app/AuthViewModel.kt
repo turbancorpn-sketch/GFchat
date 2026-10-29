@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.gfchat.app.BuildConfig
 import com.gfchat.app.data.Outcome
 import com.gfchat.app.data.PairState
 import com.gfchat.app.data.SessionStore
@@ -16,6 +17,7 @@ import kotlinx.coroutines.launch
 sealed interface AppScreen {
     data object Loading : AppScreen
     data object NotConfigured : AppScreen
+    data class UpdateRequired(val downloadUrl: String) : AppScreen
     data object SignedOut : AppScreen
     /** waitingCode != null: humne code banaya hai aur partner ke judne ka intezaar hai. */
     data class Pairing(val waitingCode: String?) : AppScreen
@@ -40,10 +42,20 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     val email: String? get() = session.email
 
     init {
-        when {
-            !api.configured -> screen = AppScreen.NotConfigured
-            !session.hasSession -> screen = AppScreen.SignedOut
-            else -> refreshStatus()
+        if (!api.configured) {
+            screen = AppScreen.NotConfigured
+        } else {
+            viewModelScope.launch {
+                // Force update check sabse pehle, login se bhi pehle.
+                when (val r = api.fetchAppConfig()) {
+                    is Outcome.Ok -> if (BuildConfig.VERSION_CODE < r.value.minVersionCode) {
+                        screen = AppScreen.UpdateRequired(r.value.downloadUrl)
+                        return@launch
+                    }
+                    is Outcome.Err -> Unit // Config check fail ho to app ko block mat karo.
+                }
+                if (!session.hasSession) screen = AppScreen.SignedOut else refreshStatus()
+            }
         }
     }
 

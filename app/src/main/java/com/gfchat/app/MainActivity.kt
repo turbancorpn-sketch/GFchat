@@ -1,5 +1,7 @@
 package com.gfchat.app
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
@@ -22,6 +24,7 @@ import com.gfchat.app.ui.auth.LoadingScreen
 import com.gfchat.app.ui.auth.LoginScreen
 import com.gfchat.app.ui.auth.NotConfiguredScreen
 import com.gfchat.app.ui.auth.PairingScreen
+import com.gfchat.app.ui.auth.UpdateRequiredScreen
 import com.gfchat.app.ui.call.CallScreen
 import com.gfchat.app.ui.chat.ChatScreen
 import com.gfchat.app.ui.lock.LockScreen
@@ -78,6 +81,9 @@ class MainActivity : FragmentActivity() {
             when (val s = vm.screen) {
                 AppScreen.Loading -> LoadingScreen()
                 AppScreen.NotConfigured -> NotConfiguredScreen()
+                is AppScreen.UpdateRequired -> UpdateRequiredScreen(onUpdate = {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(s.downloadUrl)))
+                })
                 is AppScreen.LoadError -> LoadErrorScreen(s.message, onRetry = { vm.refreshStatus() })
                 AppScreen.SignedOut -> LoginScreen(
                     busy = vm.busy,

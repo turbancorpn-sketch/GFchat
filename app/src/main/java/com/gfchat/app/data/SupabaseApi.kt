@@ -7,6 +7,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 
@@ -17,6 +18,8 @@ sealed interface Outcome<out T> {
 }
 
 enum class SignUpResult { SignedIn, ConfirmEmail }
+
+data class AppConfig(val minVersionCode: Int, val downloadUrl: String)
 
 sealed interface PairState {
     data object None : PairState
@@ -108,6 +111,26 @@ class SupabaseApi(private val session: SessionStore) {
     }
 
     fun signOut() = session.clear()
+
+    /** Login se pehle bhi chalta hai (anon key se). Table RLS me sirf public read allowed hai. */
+    suspend fun fetchAppConfig(): Outcome<AppConfig> = guard {
+        withContext(Dispatchers.IO) {
+            val req = Request.Builder()
+                .url("$base/rest/v1/app_config?select=min_version_code,download_url&id=eq.1")
+                .header("apikey", anonKey)
+                .header("Authorization", "Bearer $anonKey")
+                .get()
+                .build()
+            http.newCall(req).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) return@use Outcome.Err("Error ${resp.code}")
+                val arr = JSONArray(body)
+                if (arr.length() == 0) return@use Outcome.Err("Config nahi mila")
+                val o = arr.getJSONObject(0)
+                Outcome.Ok(AppConfig(o.getInt("min_version_code"), o.getString("download_url")))
+            }
+        }
+    }
 
     /** Valid access token deta hai; zarurat ho to refresh karta hai. */
     private suspend fun validToken(): Outcome<String> {

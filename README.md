@@ -13,6 +13,7 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 **Stage 2A (login + pairing)**
 - Email + password login/sign-up (Supabase Auth). Session encrypted storage me save hota hai, to login sirf ek baar.
 - Pairing: ek phone 8-character code banata hai (15 minute valid, ek hi baar chalta hai), doosra phone wo code daalta hai. Judne ke baad teesra koi nahi jud sakta (database level pe enforce hota hai).
+- **Force update**: app khulte hi (login se pehle) Supabase ke `app_config` table se minimum version check karta hai. Phone ka version usse kam ho to "Update karo" screen dikhti hai, aage app use nahi hoti. Naya version force karna ho: Supabase Table Editor me `app_config` row ka `min_version_code` badhao (GitHub Actions ka har build number apne aap version code ban jata hai, Actions tab me "Build APK" run ka number dekh lo).
 
 ## Abhi kya NAHI chalta (sach me)
 
@@ -24,7 +25,7 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 ## Setup (ek baar)
 
 1. [supabase.com](https://supabase.com) pe free project banao.
-2. Dashboard -> **SQL Editor** me `supabase/001_pairing.sql` ka poora content paste karke Run karo.
+2. Dashboard -> **SQL Editor** me `supabase/001_pairing.sql` aur `supabase/002_app_config.sql` dono ka poora content (alag-alag) paste karke Run karo.
 3. Dashboard -> **Authentication -> Sign In / Providers -> Email**: "Confirm email" band kar do (warna sign-up ke baad email link kholna padega; app dono sambhalti hai).
 4. `secrets.properties.example` ko `secrets.properties` naam se copy karo aur **Project Settings -> API** se `SUPABASE_URL` aur `SUPABASE_ANON_KEY` (anon/public key) daalo. Ye file git me nahi jaati. `service_role` key kabhi app me mat daalna.
 5. Android Studio me folder open karo, Gradle sync, phir phone/emulator pe Run (minSdk 26).

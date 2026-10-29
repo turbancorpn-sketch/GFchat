@@ -20,7 +20,8 @@ android {
         applicationId = "com.gfchat.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
+        // CI me GFCHAT_VERSION_CODE env se badhta hai, taaki force-update kaam kare.
+        versionCode = (System.getenv("GFCHAT_VERSION_CODE")?.toIntOrNull() ?: 1)
         versionName = "0.2.0"
 
         buildConfigField("String", "SUPABASE_URL", "\"${secrets.getProperty("SUPABASE_URL", "")}\"")
