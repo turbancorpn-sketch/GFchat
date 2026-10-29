@@ -30,3 +30,13 @@ private val Dark = darkColorScheme(
 fun GFchatTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = if (dark) Dark else Light, content = content)
 }
+
+@Composable
+fun GFchatTheme(mode: ThemeMode, content: @Composable () -> Unit) {
+    val dark = when (mode) {
+        ThemeMode.System -> isSystemInDarkTheme()
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
+    GFchatTheme(dark = dark, content = content)
+}

@@ -22,11 +22,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
+import com.gfchat.app.ui.theme.ThemeMode
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,7 +59,14 @@ import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(partnerName: String, onCall: (video: Boolean) -> Unit) {
+fun ChatScreen(
+    partnerName: String,
+    isAdmin: Boolean,
+    themeMode: ThemeMode,
+    onCall: (video: Boolean) -> Unit,
+    onAdmin: () -> Unit,
+    onToggleTheme: () -> Unit,
+) {
     val messages = remember { mutableStateListOf<Message>().apply { addAll(demoMessages()) } }
     var draft by remember { mutableStateOf("") }
     var attachMenu by remember { mutableStateOf(false) }
@@ -80,11 +92,26 @@ fun ChatScreen(partnerName: String, onCall: (video: Boolean) -> Unit) {
             TopAppBar(
                 title = { Text(partnerName) },
                 actions = {
+                    IconButton(onClick = onToggleTheme) {
+                        Icon(
+                            when (themeMode) {
+                                ThemeMode.System -> Icons.Filled.Brightness4
+                                ThemeMode.Light -> Icons.Filled.LightMode
+                                ThemeMode.Dark -> Icons.Filled.DarkMode
+                            },
+                            contentDescription = "Theme: $themeMode",
+                        )
+                    }
                     IconButton(onClick = { onCall(true) }) {
                         Icon(Icons.Filled.Videocam, contentDescription = "Video call")
                     }
                     IconButton(onClick = { onCall(false) }) {
                         Icon(Icons.Filled.Call, contentDescription = "Audio call")
+                    }
+                    if (isAdmin) {
+                        IconButton(onClick = onAdmin) {
+                            Icon(Icons.Filled.Settings, contentDescription = "Admin")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

@@ -25,10 +25,13 @@ import com.gfchat.app.ui.auth.LoginScreen
 import com.gfchat.app.ui.auth.NotConfiguredScreen
 import com.gfchat.app.ui.auth.PairingScreen
 import com.gfchat.app.ui.auth.UpdateRequiredScreen
+import com.gfchat.app.ui.admin.AdminScreen
 import com.gfchat.app.ui.call.CallScreen
 import com.gfchat.app.ui.chat.ChatScreen
 import com.gfchat.app.ui.lock.LockScreen
 import com.gfchat.app.ui.theme.GFchatTheme
+import com.gfchat.app.ui.theme.ThemeMode
+import com.gfchat.app.ui.theme.ThemeStore
 
 /** Is naam ko apni girlfriend ke naam se badal do. */
 private const val PARTNER_NAME = "My Love"
@@ -39,6 +42,7 @@ private const val RELOCK_AFTER_MS = 15_000L
 class MainActivity : FragmentActivity() {
 
     private lateinit var pinStore: PinStore
+    private lateinit var themeStore: ThemeStore
     private var locked by mutableStateOf(true)
     private var stoppedAt = 0L
 
@@ -47,11 +51,16 @@ class MainActivity : FragmentActivity() {
         // Screenshot aur recent-apps preview band.
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         pinStore = PinStore(applicationContext)
+        themeStore = ThemeStore(applicationContext)
 
         setContent {
-            GFchatTheme {
+            var themeMode by remember { mutableStateOf(themeStore.mode) }
+            GFchatTheme(mode = themeMode) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    GFchatApp()
+                    GFchatApp(
+                        themeMode = themeMode,
+                        onToggleTheme = { themeMode = themeStore.next() },
+                    )
                 }
             }
         }
@@ -70,9 +79,10 @@ class MainActivity : FragmentActivity() {
     }
 
     @Composable
-    private fun GFchatApp() {
+    private fun GFchatApp(themeMode: ThemeMode, onToggleTheme: () -> Unit) {
         // null = call nahi chal rahi, true = video call, false = audio call
         var callIsVideo by remember { mutableStateOf<Boolean?>(null) }
+        var showAdmin by remember { mutableStateOf(false) }
         val vm: AuthViewModel = viewModel()
 
         Box(Modifier.fillMaxSize()) {
@@ -105,10 +115,25 @@ class MainActivity : FragmentActivity() {
                 )
                 AppScreen.Ready -> {
                     val video = callIsVideo
-                    if (video == null) {
-                        ChatScreen(partnerName = PARTNER_NAME, onCall = { callIsVideo = it })
-                    } else {
-                        CallScreen(partnerName = PARTNER_NAME, video = video, onEnd = { callIsVideo = null })
+                    when {
+                        showAdmin -> AdminScreen(
+                            config = vm.adminConfig,
+                            busy = vm.busy,
+                            error = vm.error,
+                            info = vm.info,
+                            onLoad = vm::loadAdminConfig,
+                            onSetMinVersion = vm::setMinVersion,
+                            onBack = { showAdmin = false; vm.clearMessages() },
+                        )
+                        video == null -> ChatScreen(
+                            partnerName = PARTNER_NAME,
+                            isAdmin = vm.isAdmin,
+                            themeMode = themeMode,
+                            onCall = { callIsVideo = it },
+                            onAdmin = { showAdmin = true },
+                            onToggleTheme = onToggleTheme,
+                        )
+                        else -> CallScreen(partnerName = PARTNER_NAME, video = video, onEnd = { callIsVideo = null })
                     }
                 }
             }

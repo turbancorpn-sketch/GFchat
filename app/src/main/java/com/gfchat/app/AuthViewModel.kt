@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gfchat.app.BuildConfig
+import com.gfchat.app.data.AppConfig
 import com.gfchat.app.data.Outcome
 import com.gfchat.app.data.PairState
 import com.gfchat.app.data.SessionStore
@@ -37,6 +38,10 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     var error by mutableStateOf<String?>(null)
         private set
     var info by mutableStateOf<String?>(null)
+        private set
+    var isAdmin by mutableStateOf(false)
+        private set
+    var adminConfig by mutableStateOf<AppConfig?>(null)
         private set
 
     val email: String? get() = session.email
@@ -69,7 +74,10 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
             if (!silent) screen = AppScreen.Loading
             when (val r = api.pairStatus()) {
                 is Outcome.Ok -> screen = when (val s = r.value) {
-                    PairState.Paired -> AppScreen.Ready
+                    is PairState.Paired -> {
+                        isAdmin = s.isAdmin
+                        AppScreen.Ready
+                    }
                     is PairState.Waiting -> AppScreen.Pairing(s.code)
                     PairState.None -> AppScreen.Pairing(null)
                 }
@@ -147,6 +155,34 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     fun signOut() {
         api.signOut()
         clearMessages()
+        isAdmin = false
         screen = AppScreen.SignedOut
+    }
+
+    fun loadAdminConfig() {
+        clearMessages()
+        viewModelScope.launch {
+            busy = true
+            when (val r = api.fetchAppConfig()) {
+                is Outcome.Ok -> adminConfig = r.value
+                is Outcome.Err -> error = r.message
+            }
+            busy = false
+        }
+    }
+
+    fun setMinVersion(minVersionCode: Int, downloadUrl: String?) {
+        clearMessages()
+        viewModelScope.launch {
+            busy = true
+            when (val r = api.adminSetMinVersion(minVersionCode, downloadUrl)) {
+                is Outcome.Ok -> {
+                    info = "Force update set ho gaya."
+                    loadAdminConfig()
+                }
+                is Outcome.Err -> if (r.authExpired) screen = AppScreen.SignedOut else error = r.message
+            }
+            busy = false
+        }
     }
 }

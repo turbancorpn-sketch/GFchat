@@ -24,7 +24,7 @@ data class AppConfig(val minVersionCode: Int, val downloadUrl: String)
 sealed interface PairState {
     data object None : PairState
     data class Waiting(val code: String) : PairState
-    data object Paired : PairState
+    data class Paired(val isAdmin: Boolean) : PairState
 }
 
 /** Supabase Auth + REST ko seedha HTTP se call karta hai (koi extra SDK nahi). */
@@ -169,7 +169,7 @@ class SupabaseApi(private val session: SessionStore) {
         is Outcome.Ok -> {
             val o = JSONObject(r.value)
             val state = when (o.optString("state")) {
-                "paired" -> PairState.Paired
+                "paired" -> PairState.Paired(isAdmin = o.optBoolean("is_admin", false))
                 "waiting" -> PairState.Waiting(o.optString("code"))
                 else -> PairState.None
             }
@@ -192,4 +192,14 @@ class SupabaseApi(private val session: SessionStore) {
                 Outcome.Ok(Unit)
             }
         }
+
+    /** Sirf admin (jisne pairing code banaya tha) ke liye. */
+    suspend fun adminSetMinVersion(minVersionCode: Int, downloadUrl: String?): Outcome<Unit> {
+        val args = JSONObject().put("new_min", minVersionCode)
+        if (!downloadUrl.isNullOrBlank()) args.put("new_url", downloadUrl)
+        return when (val r = rpc("admin_set_min_version", args)) {
+            is Outcome.Err -> r
+            is Outcome.Ok -> Outcome.Ok(Unit)
+        }
+    }
 }
