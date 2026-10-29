@@ -40,5 +40,6 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 ## Aage
 
 - **Stage 2B** – real-time text, photo/video upload (private Storage), push notification (FCM).
+- **Screen-share alert (Stage 2B)** – GFchat khula ho aur uski screen record/share ho rahi ho to dono phones pe warning dikhe aur partner ko red alert notification jaye. Dono ke liye same rule, aur jis phone pe detect hota hai wahan bhi bataya jata hai. Limit: sirf GFchat ke andar detect hota hai (Android 15+ pe screen-recording callback, Android 14 pe screenshot callback), poore phone ki screen share nahi pakad sakta.
 - **Stage 3** – real audio + video call (WebRTC, signaling + TURN).
 - **Stage 4** – end-to-end encryption, voice messages, read receipts, Hindi polish.
