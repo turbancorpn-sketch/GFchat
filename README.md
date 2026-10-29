@@ -1,34 +1,44 @@
 # GFchat
 
 Do logo (aap aur aapki girlfriend) ke liye private Android chat app.
-Kotlin + Jetpack Compose + Material 3.
+Kotlin + Jetpack Compose + Material 3, backend Supabase.
 
-## Stage 1 (ye wala) – kya bana hai
+## Abhi kya bana hai
 
-- **Secret code lock**: pehli baar 4-digit code banta hai (2 baar daalna padta hai). Code kabhi plain text me save nahi hota (salt + PBKDF2 hash). 5 galat try ke baad 30 second ka lockout.
-- **Fingerprint unlock**: phone me fingerprint set ho to app khulte hi fingerprint prompt aata hai, nahi to secret code.
-- **Auto-lock**: app 15 second se zyada background me rahe to dobara lock (`RELOCK_AFTER_MS` in `MainActivity.kt`).
-- **Screenshot band**: `FLAG_SECURE` se screenshot aur recent-apps preview band.
-- **Chat UI**: text, photo (gallery se), video (gallery se) messages, bubbles, time.
-- **Audio call aur video call screen**: mute, speaker, camera on/off, timer.
-- Girlfriend ka naam badalne ke liye `PARTNER_NAME` in `MainActivity.kt`.
+**Stage 1 (phone lock + UI)**
+- 4-digit secret code (hashed, 5 galat try ke baad 30 second lockout) aur fingerprint unlock.
+- App 15 second se zyada background me rahe to dobara lock (`RELOCK_AFTER_MS` in `MainActivity.kt`). Screenshot band (`FLAG_SECURE`).
+- Chat UI (text, gallery se photo/video), audio call aur video call screens.
+
+**Stage 2A (login + pairing)**
+- Email + password login/sign-up (Supabase Auth). Session encrypted storage me save hota hai, to login sirf ek baar.
+- Pairing: ek phone 8-character code banata hai (15 minute valid, ek hi baar chalta hai), doosra phone wo code daalta hai. Judne ke baad teesra koi nahi jud sakta (database level pe enforce hota hai).
 
 ## Abhi kya NAHI chalta (sach me)
 
-- Messages demo data hain aur sirf aapke phone me dikhte hain. **Abhi dusre phone tak kuch nahi jaata.**
-- Photo/video abhi sirf aapki chat screen me dikhte hain, upload nahi hote.
-- Call screens sirf UI hain: awaaz aur video nahi jaati.
+- Chat ke messages abhi bhi demo data hain, dusre phone tak nahi jaate (Stage 2B).
+- Photo/video upload nahi hote (Stage 2B).
+- Calls me awaaz aur video nahi jaati, sirf UI hai (Stage 3).
+- Stage 2A ka code Android Studio me compile ya asli Supabase ke saath test nahi kiya gaya. Pehli baar chalane pe chhoti errors aa sakti hain.
 
-## Aage ke stages
+## Setup (ek baar)
 
-1. **Stage 2** – Real messaging: dono phones ka login/pairing (sirf 2 log), real-time text, photo/video upload (backend: Supabase Auth + Realtime + private Storage), push notification (FCM).
-2. **Stage 3** – Real audio + video call (WebRTC, signaling + TURN server), camera/mic permissions.
-3. **Stage 4** – Polish: end-to-end encryption, voice messages, read receipts, Hindi UI.
+1. [supabase.com](https://supabase.com) pe free project banao.
+2. Dashboard -> **SQL Editor** me `supabase/001_pairing.sql` ka poora content paste karke Run karo.
+3. Dashboard -> **Authentication -> Sign In / Providers -> Email**: "Confirm email" band kar do (warna sign-up ke baad email link kholna padega; app dono sambhalti hai).
+4. `secrets.properties.example` ko `secrets.properties` naam se copy karo aur **Project Settings -> API** se `SUPABASE_URL` aur `SUPABASE_ANON_KEY` (anon/public key) daalo. Ye file git me nahi jaati. `service_role` key kabhi app me mat daalna.
+5. Android Studio me folder open karo, Gradle sync, phir phone/emulator pe Run (minSdk 26).
+6. **Dono accounts ban jaane ke baad**: Authentication -> Sign In / Providers me "Allow new users to sign up" band kar do. Isse koi aur naya account ban hi nahi sakta.
 
-## Chalane ka tareeka
+## Test kaise karein
 
-1. Android Studio (Koala ya naya) me is folder ko open karo; Gradle sync hone do (wrapper Android Studio khud banata hai).
-2. Phone ya emulator pe Run karo (minSdk 26).
-3. Test: pehli baar code banao, app band karke 15 second baad kholo → lock aana chahiye; fingerprint ke liye phone me fingerprint set hona chahiye.
+1. Phone 1: secret code banao -> email+password se account banao -> "Mera pairing code banao".
+2. Phone 2: secret code banao -> alag email se account banao -> wo code daalo -> "Judo".
+3. Phone 1 par 5 second ke andar khud chat khul jani chahiye.
+4. Teesra account banao (sign-up band karne se pehle) aur code try karo: "Code galat hai" aana chahiye.
 
-Note: ye code yahan compile/test nahi kiya gaya (Android SDK available nahi tha), isliye pehli build me chhoti errors aa sakti hain; bata dena, theek kar dunga.
+## Aage
+
+- **Stage 2B** – real-time text, photo/video upload (private Storage), push notification (FCM).
+- **Stage 3** – real audio + video call (WebRTC, signaling + TURN).
+- **Stage 4** – end-to-end encryption, voice messages, read receipts, Hindi polish.

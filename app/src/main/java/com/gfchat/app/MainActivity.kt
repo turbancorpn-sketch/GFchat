@@ -16,6 +16,12 @@ import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import com.gfchat.app.security.BiometricHelper
 import com.gfchat.app.security.PinStore
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.gfchat.app.ui.auth.LoadErrorScreen
+import com.gfchat.app.ui.auth.LoadingScreen
+import com.gfchat.app.ui.auth.LoginScreen
+import com.gfchat.app.ui.auth.NotConfiguredScreen
+import com.gfchat.app.ui.auth.PairingScreen
 import com.gfchat.app.ui.call.CallScreen
 import com.gfchat.app.ui.chat.ChatScreen
 import com.gfchat.app.ui.lock.LockScreen
@@ -64,15 +70,41 @@ class MainActivity : FragmentActivity() {
     private fun GFchatApp() {
         // null = call nahi chal rahi, true = video call, false = audio call
         var callIsVideo by remember { mutableStateOf<Boolean?>(null) }
+        val vm: AuthViewModel = viewModel()
 
         Box(Modifier.fillMaxSize()) {
-            // Chat hamesha compose rehti hai taaki lock hone par bhi state na jaaye;
+            // Neeche ki screen hamesha compose rehti hai taaki lock hone par bhi state na jaaye;
             // lock screen uske upar pura dhak deti hai.
-            val video = callIsVideo
-            if (video == null) {
-                ChatScreen(partnerName = PARTNER_NAME, onCall = { callIsVideo = it })
-            } else {
-                CallScreen(partnerName = PARTNER_NAME, video = video, onEnd = { callIsVideo = null })
+            when (val s = vm.screen) {
+                AppScreen.Loading -> LoadingScreen()
+                AppScreen.NotConfigured -> NotConfiguredScreen()
+                is AppScreen.LoadError -> LoadErrorScreen(s.message, onRetry = { vm.refreshStatus() })
+                AppScreen.SignedOut -> LoginScreen(
+                    busy = vm.busy,
+                    error = vm.error,
+                    info = vm.info,
+                    onSignIn = vm::signIn,
+                    onSignUp = vm::signUp,
+                    onClear = vm::clearMessages,
+                )
+                is AppScreen.Pairing -> PairingScreen(
+                    waitingCode = s.waitingCode,
+                    busy = vm.busy,
+                    error = vm.error,
+                    email = vm.email,
+                    onCreateCode = vm::createCode,
+                    onJoin = vm::joinWithCode,
+                    onPoll = { vm.refreshStatus(silent = true) },
+                    onSignOut = vm::signOut,
+                )
+                AppScreen.Ready -> {
+                    val video = callIsVideo
+                    if (video == null) {
+                        ChatScreen(partnerName = PARTNER_NAME, onCall = { callIsVideo = it })
+                    } else {
+                        CallScreen(partnerName = PARTNER_NAME, video = video, onEnd = { callIsVideo = null })
+                    }
+                }
             }
 
             if (locked) {
