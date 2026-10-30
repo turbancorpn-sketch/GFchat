@@ -10,6 +10,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 sealed interface Outcome<out T> {
     data class Ok<T>(val value: T) : Outcome<T>
@@ -41,7 +42,11 @@ sealed interface PairState {
 /** Supabase Auth + REST ko seedha HTTP se call karta hai (koi extra SDK nahi). */
 class SupabaseApi(private val session: SessionStore) {
 
-    private val http = OkHttpClient()
+    private val http = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .build()
     private val base = BuildConfig.SUPABASE_URL.trimEnd('/')
     private val anonKey = BuildConfig.SUPABASE_ANON_KEY
     private val json = "application/json".toMediaType()
@@ -242,6 +247,57 @@ class SupabaseApi(private val session: SessionStore) {
     suspend fun markRead(): Outcome<Unit> = when (val r = rpc("mark_read")) {
         is Outcome.Err -> r
         is Outcome.Ok -> Outcome.Ok(Unit)
+    }
+
+    suspend fun myCoupleId(): Outcome<String> = when (val r = rpc("my_couple_id")) {
+        is Outcome.Err -> r
+        is Outcome.Ok -> Outcome.Ok(r.value.trim().trim('"'))
+    }
+
+    /** Private "media" bucket me upload karta hai. `path` = "{coupleId}/{filename}". */
+    suspend fun uploadMedia(path: String, bytes: ByteArray, mimeType: String): Outcome<Unit> {
+        val token = when (val t = validToken()) {
+            is Outcome.Ok -> t.value
+            is Outcome.Err -> return t
+        }
+        return guard {
+            withContext(Dispatchers.IO) {
+                val req = Request.Builder()
+                    .url("$base/storage/v1/object/media/$path")
+                    .header("apikey", anonKey)
+                    .header("Authorization", "Bearer $token")
+                    .post(bytes.toRequestBody(mimeType.toMediaType()))
+                    .build()
+                http.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) Outcome.Ok(Unit)
+                    else Outcome.Err("Upload fail hua (${resp.code}).")
+                }
+            }
+        }
+    }
+
+    /** Private file dikhane ke liye time-limited URL banata hai (1 ghanta valid). */
+    suspend fun createSignedUrl(path: String): Outcome<String> {
+        val token = when (val t = validToken()) {
+            is Outcome.Ok -> t.value
+            is Outcome.Err -> return t
+        }
+        return guard {
+            withContext(Dispatchers.IO) {
+                val req = Request.Builder()
+                    .url("$base/storage/v1/object/sign/media/$path")
+                    .header("apikey", anonKey)
+                    .header("Authorization", "Bearer $token")
+                    .post(JSONObject().put("expiresIn", 3600).toString().toRequestBody(json))
+                    .build()
+                http.newCall(req).execute().use { resp ->
+                    val bodyStr = resp.body?.string().orEmpty()
+                    if (!resp.isSuccessful) return@use Outcome.Err("Error ${resp.code}")
+                    val signedPath = JSONObject(bodyStr).getString("signedURL")
+                    Outcome.Ok("$base/storage/v1$signedPath")
+                }
+            }
+        }
     }
 
     /** Sirf admin (jisne pairing code banaya tha) ke liye. */

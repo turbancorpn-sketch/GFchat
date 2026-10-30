@@ -1,9 +1,12 @@
 package com.gfchat.app.ui.chat
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +22,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,7 +52,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,10 +59,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.gfchat.app.ChatViewModel
+import com.gfchat.app.data.ChatMessage
 import com.gfchat.app.data.TickStatus
 import com.gfchat.app.ui.theme.ThemeMode
 import java.text.SimpleDateFormat
@@ -92,22 +96,19 @@ fun ChatScreen(
         onDispose { vm.stopPolling() }
     }
 
-    // Photo/video abhi sirf is phone pe dikhte hain (upload abhi nahi bana hai).
-    val localMedia = remember { mutableStateListOf<LocalMedia>() }
     var draft by remember { mutableStateOf("") }
     var attachMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) localMedia.add(LocalMedia(System.nanoTime(), isVideo = false, uri = uri))
+        if (uri != null) vm.sendMedia(uri, isVideo = false)
     }
     val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) localMedia.add(LocalMedia(System.nanoTime(), isVideo = true, uri = uri))
+        if (uri != null) vm.sendMedia(uri, isVideo = true)
     }
 
-    val itemCount = vm.messages.size + localMedia.size
-    LaunchedEffect(itemCount) {
-        if (itemCount > 0) listState.animateScrollToItem(itemCount - 1)
+    LaunchedEffect(vm.messages.size) {
+        if (vm.messages.isNotEmpty()) listState.animateScrollToItem(vm.messages.lastIndex)
     }
 
     Scaffold(
@@ -159,8 +160,9 @@ fun ChatScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box {
-                        IconButton(onClick = { attachMenu = true }) {
-                            Icon(Icons.Filled.AttachFile, contentDescription = "Attach")
+                        IconButton(onClick = { attachMenu = true }, enabled = !vm.uploading) {
+                            if (vm.uploading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            else Icon(Icons.Filled.AttachFile, contentDescription = "Attach")
                         }
                         DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
                             DropdownMenuItem(
@@ -211,16 +213,18 @@ fun ChatScreen(
                 .padding(horizontal = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            items(vm.messages, key = { "m${it.id}" }) { TextBubble(it) }
-            items(localMedia, key = { "l${it.id}" }) { MediaBubble(it) }
+            items(vm.messages, key = { it.id }) { msg ->
+                when (msg.kind) {
+                    "photo", "video" -> MediaBubble(msg, signedUrl = vm.signedUrlFor(msg))
+                    else -> TextBubble(msg)
+                }
+            }
         }
     }
 }
 
-private data class LocalMedia(val id: Long, val isVideo: Boolean, val uri: android.net.Uri)
-
 @Composable
-private fun TextBubble(m: com.gfchat.app.data.ChatMessage) {
+private fun TextBubble(m: ChatMessage) {
     val mine = m.fromMe
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         Column(
@@ -235,54 +239,70 @@ private fun TextBubble(m: com.gfchat.app.data.ChatMessage) {
         ) {
             Text(m.body.orEmpty())
             Spacer(Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                Text(timeLabel(m.createdAt), style = MaterialTheme.typography.labelSmall)
-                if (mine) {
-                    Spacer(Modifier.width(4.dp))
-                    val (icon, tint) = when (m.status) {
-                        TickStatus.Sent -> Icons.Filled.Check to MaterialTheme.colorScheme.onSurfaceVariant
-                        TickStatus.Delivered -> Icons.Filled.DoneAll to MaterialTheme.colorScheme.onSurfaceVariant
-                        TickStatus.Read -> Icons.Filled.DoneAll to MaterialTheme.colorScheme.primary
-                    }
-                    Icon(icon, contentDescription = m.status.name, tint = tint, modifier = Modifier.size(14.dp))
-                }
-            }
+            BubbleFooter(m)
         }
     }
 }
 
 @Composable
-private fun MediaBubble(m: LocalMedia) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+private fun MediaBubble(m: ChatMessage, signedUrl: String?) {
+    val mine = m.fromMe
+    val context = LocalContext.current
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         Column(
             Modifier
                 .widthIn(max = 280.dp)
-                .clip(bubbleShape(mine = true))
-                .background(MaterialTheme.colorScheme.primaryContainer)
+                .clip(bubbleShape(mine))
+                .background(
+                    if (mine) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.secondaryContainer
+                )
                 .padding(10.dp),
         ) {
-            if (!m.isVideo) {
-                AsyncImage(
-                    model = m.uri,
+            val mediaModifier = Modifier
+                .size(width = 240.dp, height = if (m.kind == "photo") 240.dp else 140.dp)
+                .clip(RoundedCornerShape(12.dp))
+
+            when {
+                signedUrl == null -> Box(
+                    mediaModifier.background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center,
+                ) { CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp) }
+
+                m.kind == "photo" -> AsyncImage(
+                    model = signedUrl,
                     contentDescription = "Photo",
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(width = 240.dp, height = 240.dp).clip(RoundedCornerShape(12.dp)),
+                    modifier = mediaModifier,
                 )
-            } else {
-                Box(
-                    Modifier
-                        .size(width = 240.dp, height = 140.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)),
+
+                else -> Box(
+                    mediaModifier
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+                        .clickable {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(signedUrl)))
+                        },
                     contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.PlayCircle, contentDescription = "Video", modifier = Modifier.size(56.dp)) }
+                ) { Icon(Icons.Filled.PlayCircle, contentDescription = "Video chalao", modifier = Modifier.size(56.dp)) }
             }
             Spacer(Modifier.height(2.dp))
-            Text(
-                "Sirf tumhe dikh raha hai (abhi bhejna ban raha hai)",
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.align(Alignment.End),
-            )
+            BubbleFooter(m)
+        }
+    }
+}
+
+@Composable
+private fun BubbleFooter(m: ChatMessage) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+        Text(timeLabel(m.createdAt), style = MaterialTheme.typography.labelSmall)
+        if (m.fromMe) {
+            Spacer(Modifier.width(4.dp))
+            val (icon, tint) = when (m.status) {
+                TickStatus.Sent -> Icons.Filled.Check to MaterialTheme.colorScheme.onSurfaceVariant
+                TickStatus.Delivered -> Icons.Filled.DoneAll to MaterialTheme.colorScheme.onSurfaceVariant
+                TickStatus.Read -> Icons.Filled.DoneAll to MaterialTheme.colorScheme.primary
+            }
+            Icon(icon, contentDescription = m.status.name, tint = tint, modifier = Modifier.size(14.dp))
         }
     }
 }
