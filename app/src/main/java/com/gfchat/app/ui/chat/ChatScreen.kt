@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,14 +25,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
-import com.gfchat.app.ui.theme.ThemeMode
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -55,7 +58,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.gfchat.app.ChatViewModel
+import com.gfchat.app.data.TickStatus
+import com.gfchat.app.ui.theme.ThemeMode
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
+
+private fun timeLabel(isoUtc: String): String = try {
+    val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+        .apply { timeZone = TimeZone.getTimeZone("UTC") }
+    val date = parser.parse(isoUtc.take(19))
+    SimpleDateFormat("hh:mm a", Locale.getDefault()).format(date!!)
+} catch (e: Exception) {
+    ""
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,24 +86,28 @@ fun ChatScreen(
     onAdmin: () -> Unit,
     onToggleTheme: () -> Unit,
 ) {
-    val messages = remember { mutableStateListOf<Message>().apply { addAll(demoMessages()) } }
+    val vm: ChatViewModel = viewModel()
+    DisposableEffect(Unit) {
+        vm.startPolling()
+        onDispose { vm.stopPolling() }
+    }
+
+    // Photo/video abhi sirf is phone pe dikhte hain (upload abhi nahi bana hai).
+    val localMedia = remember { mutableStateListOf<LocalMedia>() }
     var draft by remember { mutableStateOf("") }
     var attachMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
-    fun add(kind: MessageKind, text: String = "", uri: android.net.Uri? = null) {
-        messages.add(Message(id = System.nanoTime(), fromMe = true, kind = kind, text = text, uri = uri))
-    }
-
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) add(MessageKind.Photo, uri = uri)
+        if (uri != null) localMedia.add(LocalMedia(System.nanoTime(), isVideo = false, uri = uri))
     }
     val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) add(MessageKind.Video, uri = uri)
+        if (uri != null) localMedia.add(LocalMedia(System.nanoTime(), isVideo = true, uri = uri))
     }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    val itemCount = vm.messages.size + localMedia.size
+    LaunchedEffect(itemCount) {
+        if (itemCount > 0) listState.animateScrollToItem(itemCount - 1)
     }
 
     Scaffold(
@@ -120,53 +143,62 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box {
-                    IconButton(onClick = { attachMenu = true }) {
-                        Icon(Icons.Filled.AttachFile, contentDescription = "Attach")
-                    }
-                    DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Photo") },
-                            leadingIcon = { Icon(Icons.Filled.Image, null) },
-                            onClick = {
-                                attachMenu = false
-                                photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Video") },
-                            leadingIcon = { Icon(Icons.Filled.Videocam, null) },
-                            onClick = {
-                                attachMenu = false
-                                videoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
-                            },
-                        )
-                    }
+            Column {
+                if (vm.error != null) {
+                    Text(
+                        vm.error!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
                 }
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Message likho...") },
-                    shape = RoundedCornerShape(24.dp),
-                    maxLines = 4,
-                )
-                IconButton(
-                    onClick = {
-                        val t = draft.trim()
-                        if (t.isNotEmpty()) {
-                            add(MessageKind.Text, text = t)
-                            draft = ""
-                        }
-                    },
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                    Box {
+                        IconButton(onClick = { attachMenu = true }) {
+                            Icon(Icons.Filled.AttachFile, contentDescription = "Attach")
+                        }
+                        DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Photo") },
+                                leadingIcon = { Icon(Icons.Filled.Image, null) },
+                                onClick = {
+                                    attachMenu = false
+                                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Video") },
+                                leadingIcon = { Icon(Icons.Filled.Videocam, null) },
+                                onClick = {
+                                    attachMenu = false
+                                    videoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                                },
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Message likho...") },
+                        shape = RoundedCornerShape(24.dp),
+                        maxLines = 4,
+                    )
+                    IconButton(
+                        onClick = {
+                            if (draft.isNotBlank()) {
+                                vm.send(draft)
+                                draft = ""
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
         },
@@ -179,60 +211,84 @@ fun ChatScreen(
                 .padding(horizontal = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            items(messages, key = { it.id }) { Bubble(it) }
+            items(vm.messages, key = { "m${it.id}" }) { TextBubble(it) }
+            items(localMedia, key = { "l${it.id}" }) { MediaBubble(it) }
         }
     }
 }
 
+private data class LocalMedia(val id: Long, val isVideo: Boolean, val uri: android.net.Uri)
+
 @Composable
-private fun Bubble(m: Message) {
+private fun TextBubble(m: com.gfchat.app.data.ChatMessage) {
     val mine = m.fromMe
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
-    ) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         Column(
             Modifier
                 .widthIn(max = 280.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 16.dp, topEnd = 16.dp,
-                        bottomStart = if (mine) 16.dp else 4.dp,
-                        bottomEnd = if (mine) 4.dp else 16.dp,
-                    )
-                )
+                .clip(bubbleShape(mine))
                 .background(
                     if (mine) MaterialTheme.colorScheme.primaryContainer
                     else MaterialTheme.colorScheme.secondaryContainer
                 )
                 .padding(10.dp),
         ) {
-            when (m.kind) {
-                MessageKind.Text -> Text(m.text)
-                MessageKind.Photo -> AsyncImage(
+            Text(m.body.orEmpty())
+            Spacer(Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                Text(timeLabel(m.createdAt), style = MaterialTheme.typography.labelSmall)
+                if (mine) {
+                    Spacer(Modifier.width(4.dp))
+                    val (icon, tint) = when (m.status) {
+                        TickStatus.Sent -> Icons.Filled.Check to MaterialTheme.colorScheme.onSurfaceVariant
+                        TickStatus.Delivered -> Icons.Filled.DoneAll to MaterialTheme.colorScheme.onSurfaceVariant
+                        TickStatus.Read -> Icons.Filled.DoneAll to MaterialTheme.colorScheme.primary
+                    }
+                    Icon(icon, contentDescription = m.status.name, tint = tint, modifier = Modifier.size(14.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaBubble(m: LocalMedia) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Column(
+            Modifier
+                .widthIn(max = 280.dp)
+                .clip(bubbleShape(mine = true))
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .padding(10.dp),
+        ) {
+            if (!m.isVideo) {
+                AsyncImage(
                     model = m.uri,
                     contentDescription = "Photo",
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(width = 240.dp, height = 240.dp)
-                        .clip(RoundedCornerShape(12.dp)),
+                    modifier = Modifier.size(width = 240.dp, height = 240.dp).clip(RoundedCornerShape(12.dp)),
                 )
-                MessageKind.Video -> Box(
+            } else {
+                Box(
                     Modifier
                         .size(width = 240.dp, height = 140.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.PlayCircle, contentDescription = "Video", modifier = Modifier.size(56.dp))
-                }
+                ) { Icon(Icons.Filled.PlayCircle, contentDescription = "Video", modifier = Modifier.size(56.dp)) }
             }
             Spacer(Modifier.height(2.dp))
             Text(
-                m.time,
+                "Sirf tumhe dikh raha hai (abhi bhejna ban raha hai)",
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.align(Alignment.End),
             )
         }
     }
 }
+
+private fun bubbleShape(mine: Boolean) = RoundedCornerShape(
+    topStart = 16.dp, topEnd = 16.dp,
+    bottomStart = if (mine) 16.dp else 4.dp,
+    bottomEnd = if (mine) 4.dp else 16.dp,
+)

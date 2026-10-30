@@ -21,6 +21,17 @@ enum class SignUpResult { SignedIn, ConfirmEmail }
 
 data class AppConfig(val minVersionCode: Int, val downloadUrl: String)
 
+enum class TickStatus { Sent, Delivered, Read }
+
+data class ChatMessage(
+    val id: Long,
+    val fromMe: Boolean,
+    val kind: String,
+    val body: String?,
+    val createdAt: String,
+    val status: TickStatus,
+)
+
 sealed interface PairState {
     data object None : PairState
     data class Waiting(val code: String) : PairState
@@ -192,6 +203,46 @@ class SupabaseApi(private val session: SessionStore) {
                 Outcome.Ok(Unit)
             }
         }
+
+    private fun messageFromJson(o: JSONObject): ChatMessage {
+        val fromMe = o.optBoolean("from_me", false)
+        val status = when {
+            !o.isNull("read_at") -> TickStatus.Read
+            !o.isNull("delivered_at") -> TickStatus.Delivered
+            else -> TickStatus.Sent
+        }
+        return ChatMessage(
+            id = o.getLong("id"),
+            fromMe = fromMe,
+            kind = o.getString("kind"),
+            body = if (o.isNull("body")) null else o.getString("body"),
+            createdAt = o.getString("created_at"),
+            status = status,
+        )
+    }
+
+    suspend fun sendMessage(kind: String, body: String?): Outcome<ChatMessage> {
+        val args = JSONObject().put("kind", kind)
+        args.put("body", body ?: JSONObject.NULL)
+        return when (val r = rpc("send_message", args)) {
+            is Outcome.Err -> r
+            is Outcome.Ok -> Outcome.Ok(messageFromJson(JSONObject(r.value)))
+        }
+    }
+
+    suspend fun fetchMessages(afterId: Long): Outcome<List<ChatMessage>> =
+        when (val r = rpc("fetch_messages", JSONObject().put("after_id", afterId))) {
+            is Outcome.Err -> r
+            is Outcome.Ok -> {
+                val arr = JSONArray(r.value)
+                Outcome.Ok((0 until arr.length()).map { messageFromJson(arr.getJSONObject(it)) })
+            }
+        }
+
+    suspend fun markRead(): Outcome<Unit> = when (val r = rpc("mark_read")) {
+        is Outcome.Err -> r
+        is Outcome.Ok -> Outcome.Ok(Unit)
+    }
 
     /** Sirf admin (jisne pairing code banaya tha) ke liye. */
     suspend fun adminSetMinVersion(minVersionCode: Int, downloadUrl: String?): Outcome<Unit> {
