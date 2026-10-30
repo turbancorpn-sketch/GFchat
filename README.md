@@ -16,6 +16,7 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 - **Force update**: app khulte hi (login se pehle) Supabase ke `app_config` table se minimum version check karta hai. Phone ka version usse kam ho to "Update karo" screen dikhti hai, aage app use nahi hoti. Naya version force karna ho: Supabase Table Editor me `app_config` row ka `min_version_code` badhao (GitHub Actions ka har build number apne aap version code ban jata hai, Actions tab me "Build APK" run ka number dekh lo).
 - **Admin panel**: jisne sabse pehle pairing code banaya tha (wahi "admin"), usi phone pe chat screen ke top bar me gear icon dikhta hai. Isse force-update ka minimum version seedha app se set kar sakte ho, Supabase dashboard me jaane ki zarurat nahi. Partner ke phone pe ye icon nahi aata (database level pe check hota hai, sirf UI nahi).
 - **Theme**: chat screen ke top bar me ek icon se Light / Dark / System (phone ki setting ke hisaab se) switch kar sakte ho. Har phone apni setting alag rakhta hai.
+- **App icon**: simple laal gol icon (adaptive icon, `app/src/main/res/drawable/ic_launcher_foreground.xml` me badal sakte ho).
 
 ## Abhi kya NAHI chalta (sach me)
 
