@@ -8,7 +8,7 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 **Stage 1 (phone lock + UI)**
 - 4-digit secret code (hashed, 5 galat try ke baad 30 second lockout) aur fingerprint unlock.
 - App 15 second se zyada background me rahe to dobara lock (`RELOCK_AFTER_MS` in `MainActivity.kt`). Screenshot band (`FLAG_SECURE`).
-- Chat UI (text, gallery se photo/video), audio call aur video call screens.
+- Chat UI (text, gallery se photo/video).
 
 **Stage 2A (login + pairing)**
 - Email + password login/sign-up (Supabase Auth). Session encrypted storage me save hota hai, to login sirf ek baar.
@@ -37,7 +37,7 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 
 ## Abhi kya NAHI chalta (sach me)
 
-- **Calls abhi sirf UI hain** — audio/video call screen khulti hai, timer chalta hai, par asli awaaz ya video kisi tak nahi jaati. Isko bananе ke liye WebRTC + ek signaling/TURN server chahiye, jo apne aap me ek bada, alag kaam hai.
+- **Audio/video call hata diya gaya hai** — pehle sirf UI demo tha (asli awaaz/video nahi jaata tha), isliye button hi hata diya taaki galatfehmi na ho. Real calling (WebRTC + signaling/TURN server) chahiye to Stage 3 me alag se banega.
 - Push notification nahi hai — message tabhi milega jab Chat screen khuli ho (poll-based + in-app tone). App band ho ya kisi aur screen pe ho to turant pata nahi chalega.
 - Stage 2A/2B/2C/2D ka code Android Studio me compile ya asli Supabase ke saath test nahi kiya gaya. Pehli baar chalane pe chhoti errors aa sakti hain.
 
@@ -61,5 +61,5 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 
 - **Stage 2E** – push notification (FCM) taaki background me bhi message mil jaye.
 - **Screen-share alert** – app khula ho aur uski screen record/share ho rahi ho to dono phones pe warning dikhe aur partner ko red alert notification jaye. Limit: sirf app ke andar detect hota hai, poore phone ki screen share nahi pakad sakta.
-- **Stage 3** – real audio + video call (WebRTC, signaling + TURN).
+- **Stage 3** – real audio + video call (WebRTC, signaling + TURN) — call button fir se add hoga jab yeh ready ho.
 - **Stage 4** – end-to-end encryption, voice messages, read receipts, Hindi polish.

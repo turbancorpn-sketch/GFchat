@@ -26,7 +26,6 @@ import com.gfchat.app.ui.auth.NotConfiguredScreen
 import com.gfchat.app.ui.auth.PairingScreen
 import com.gfchat.app.ui.auth.UpdateRequiredScreen
 import com.gfchat.app.ui.admin.AdminScreen
-import com.gfchat.app.ui.call.CallScreen
 import com.gfchat.app.ui.chat.ChatScreen
 import com.gfchat.app.ui.lock.LockScreen
 import com.gfchat.app.ui.theme.GFchatTheme
@@ -81,7 +80,6 @@ class MainActivity : FragmentActivity() {
     @Composable
     private fun GFchatApp(themeMode: ThemeMode, onToggleTheme: () -> Unit) {
         // null = call nahi chal rahi, true = video call, false = audio call
-        var callIsVideo by remember { mutableStateOf<Boolean?>(null) }
         var showAdmin by remember { mutableStateOf(false) }
         val vm: AuthViewModel = viewModel()
 
@@ -114,9 +112,8 @@ class MainActivity : FragmentActivity() {
                     onSignOut = vm::signOut,
                 )
                 AppScreen.Ready -> {
-                    val video = callIsVideo
-                    when {
-                        showAdmin -> AdminScreen(
+                    if (showAdmin) {
+                        AdminScreen(
                             config = vm.adminConfig,
                             busy = vm.busy,
                             error = vm.error,
@@ -125,15 +122,14 @@ class MainActivity : FragmentActivity() {
                             onSetMinVersion = vm::setMinVersion,
                             onBack = { showAdmin = false; vm.clearMessages() },
                         )
-                        video == null -> ChatScreen(
+                    } else {
+                        ChatScreen(
                             partnerName = PARTNER_NAME,
                             isAdmin = vm.isAdmin,
                             themeMode = themeMode,
-                            onCall = { callIsVideo = it },
                             onAdmin = { showAdmin = true },
                             onToggleTheme = onToggleTheme,
                         )
-                        else -> CallScreen(partnerName = PARTNER_NAME, video = video, onEnd = { callIsVideo = null })
                     }
                 }
             }

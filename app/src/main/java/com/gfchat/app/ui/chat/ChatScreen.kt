@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Brightness4
-import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -93,7 +92,6 @@ fun ChatScreen(
     partnerName: String,
     isAdmin: Boolean,
     themeMode: ThemeMode,
-    onCall: (video: Boolean) -> Unit,
     onAdmin: () -> Unit,
     onToggleTheme: () -> Unit,
 ) {
@@ -162,12 +160,6 @@ fun ChatScreen(
                             },
                             contentDescription = "Theme: $themeMode",
                         )
-                    }
-                    IconButton(onClick = { onCall(true) }) {
-                        Icon(Icons.Filled.Videocam, contentDescription = "Video call")
-                    }
-                    IconButton(onClick = { onCall(false) }) {
-                        Icon(Icons.Filled.Call, contentDescription = "Audio call")
                     }
                     if (isAdmin) {
                         IconButton(onClick = onAdmin) {
