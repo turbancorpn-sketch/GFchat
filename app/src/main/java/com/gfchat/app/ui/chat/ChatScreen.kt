@@ -5,8 +5,10 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,13 +31,16 @@ import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -46,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -60,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -98,6 +105,9 @@ fun ChatScreen(
 
     var draft by remember { mutableStateOf("") }
     var attachMenu by remember { mutableStateOf(false) }
+    var overflowMenu by remember { mutableStateOf(false) }
+    var confirmClearChat by remember { mutableStateOf(false) }
+    var deleteCandidateId by remember { mutableStateOf<Long?>(null) }
     val listState = rememberLazyListState()
 
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -109,6 +119,33 @@ fun ChatScreen(
 
     LaunchedEffect(vm.messages.size) {
         if (vm.messages.isNotEmpty()) listState.animateScrollToItem(vm.messages.lastIndex)
+    }
+
+    if (confirmClearChat) {
+        AlertDialog(
+            onDismissRequest = { confirmClearChat = false },
+            title = { Text("Poori chat clear karo?") },
+            text = { Text("Sare messages dono phones se hamesha ke liye mit jaayenge.") },
+            confirmButton = {
+                TextButton(onClick = { confirmClearChat = false; vm.clearChat() }) {
+                    Text("Clear karo", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmClearChat = false }) { Text("Cancel") } },
+        )
+    }
+    deleteCandidateId?.let { id ->
+        AlertDialog(
+            onDismissRequest = { deleteCandidateId = null },
+            title = { Text("Message delete karo?") },
+            text = { Text("Ye dono phones se hat jaayega (delete for everyone).") },
+            confirmButton = {
+                TextButton(onClick = { vm.deleteMessage(id); deleteCandidateId = null }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { deleteCandidateId = null }) { Text("Cancel") } },
+        )
     }
 
     Scaffold(
@@ -135,6 +172,18 @@ fun ChatScreen(
                     if (isAdmin) {
                         IconButton(onClick = onAdmin) {
                             Icon(Icons.Filled.Settings, contentDescription = "Admin")
+                        }
+                    }
+                    Box {
+                        IconButton(onClick = { overflowMenu = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "Aur options")
+                        }
+                        DropdownMenu(expanded = overflowMenu, onDismissRequest = { overflowMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Chat clear karo") },
+                                leadingIcon = { Icon(Icons.Filled.DeleteSweep, null) },
+                                onClick = { overflowMenu = false; confirmClearChat = true },
+                            )
                         }
                     }
                 },
@@ -214,17 +263,21 @@ fun ChatScreen(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             items(vm.messages, key = { it.id }) { msg ->
-                when (msg.kind) {
-                    "photo", "video" -> MediaBubble(msg, signedUrl = vm.signedUrlFor(msg))
-                    else -> TextBubble(msg)
+                val onLongPress: () -> Unit = { if (msg.fromMe && !msg.deleted) deleteCandidateId = msg.id }
+                when {
+                    msg.deleted -> DeletedBubble(msg)
+                    msg.kind == "photo" || msg.kind == "video" ->
+                        MediaBubble(msg, signedUrl = vm.signedUrlFor(msg), onLongPress = onLongPress)
+                    else -> TextBubble(msg, onLongPress = onLongPress)
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TextBubble(m: ChatMessage) {
+private fun TextBubble(m: ChatMessage, onLongPress: () -> Unit) {
     val mine = m.fromMe
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         Column(
@@ -235,6 +288,7 @@ private fun TextBubble(m: ChatMessage) {
                     if (mine) MaterialTheme.colorScheme.primaryContainer
                     else MaterialTheme.colorScheme.secondaryContainer
                 )
+                .combinedClickable(onClick = {}, onLongClick = onLongPress)
                 .padding(10.dp),
         ) {
             Text(m.body.orEmpty())
@@ -244,8 +298,9 @@ private fun TextBubble(m: ChatMessage) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MediaBubble(m: ChatMessage, signedUrl: String?) {
+private fun MediaBubble(m: ChatMessage, signedUrl: String?, onLongPress: () -> Unit) {
     val mine = m.fromMe
     val context = LocalContext.current
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
@@ -257,6 +312,7 @@ private fun MediaBubble(m: ChatMessage, signedUrl: String?) {
                     if (mine) MaterialTheme.colorScheme.primaryContainer
                     else MaterialTheme.colorScheme.secondaryContainer
                 )
+                .combinedClickable(onClick = {}, onLongClick = onLongPress)
                 .padding(10.dp),
         ) {
             val mediaModifier = Modifier
@@ -285,6 +341,29 @@ private fun MediaBubble(m: ChatMessage, signedUrl: String?) {
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Filled.PlayCircle, contentDescription = "Video chalao", modifier = Modifier.size(56.dp)) }
             }
+            Spacer(Modifier.height(2.dp))
+            BubbleFooter(m)
+        }
+    }
+}
+
+@Composable
+private fun DeletedBubble(m: ChatMessage) {
+    val mine = m.fromMe
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
+        Column(
+            Modifier
+                .widthIn(max = 280.dp)
+                .clip(bubbleShape(mine))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                .padding(10.dp),
+        ) {
+            Text(
+                "Ye message delete ho chuka hai",
+                fontStyle = FontStyle.Italic,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(Modifier.height(2.dp))
             BubbleFooter(m)
         }

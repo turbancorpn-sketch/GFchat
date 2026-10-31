@@ -30,7 +30,9 @@ data class ChatMessage(
     val kind: String,
     val body: String?,
     val createdAt: String,
+    val updatedAt: String,
     val status: TickStatus,
+    val deleted: Boolean,
 )
 
 sealed interface PairState {
@@ -222,7 +224,9 @@ class SupabaseApi(private val session: SessionStore) {
             kind = o.getString("kind"),
             body = if (o.isNull("body")) null else o.getString("body"),
             createdAt = o.getString("created_at"),
+            updatedAt = o.getString("updated_at"),
             status = status,
+            deleted = o.optBoolean("deleted", false),
         )
     }
 
@@ -235,16 +239,33 @@ class SupabaseApi(private val session: SessionStore) {
         }
     }
 
-    suspend fun fetchMessages(afterId: Long): Outcome<List<ChatMessage>> =
-        when (val r = rpc("fetch_messages", JSONObject().put("after_id", afterId))) {
+    /** since = pichhli baar dekha hua sabse naya updated_at (null = pehli baar, sab laao). */
+    suspend fun fetchMessages(since: String?): Outcome<List<ChatMessage>> {
+        val args = JSONObject()
+        args.put("since", since ?: JSONObject.NULL)
+        return when (val r = rpc("fetch_messages", args)) {
             is Outcome.Err -> r
             is Outcome.Ok -> {
                 val arr = JSONArray(r.value)
                 Outcome.Ok((0 until arr.length()).map { messageFromJson(arr.getJSONObject(it)) })
             }
         }
+    }
 
     suspend fun markRead(): Outcome<Unit> = when (val r = rpc("mark_read")) {
+        is Outcome.Err -> r
+        is Outcome.Ok -> Outcome.Ok(Unit)
+    }
+
+    /** "Delete for everyone" — sirf apna hi message delete kar sakte ho. */
+    suspend fun deleteMessage(id: Long): Outcome<Unit> =
+        when (val r = rpc("delete_message", JSONObject().put("message_id", id))) {
+            is Outcome.Err -> r
+            is Outcome.Ok -> Outcome.Ok(Unit)
+        }
+
+    /** Poori chat dono phones se clear kar deta hai. */
+    suspend fun clearChat(): Outcome<Unit> = when (val r = rpc("clear_chat")) {
         is Outcome.Err -> r
         is Outcome.Ok -> Outcome.Ok(Unit)
     }

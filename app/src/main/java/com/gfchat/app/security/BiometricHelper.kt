@@ -28,7 +28,7 @@ object BiometricHelper {
             }
         }
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("GFchat unlock")
+            .setTitle("Closer unlock")
             .setSubtitle("Fingerprint se unlock karo")
             .setNegativeButtonText("Secret code use karo")
             .setAllowedAuthenticators(BIOMETRIC_STRONG)

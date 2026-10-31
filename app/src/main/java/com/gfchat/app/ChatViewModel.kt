@@ -19,8 +19,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-/** Har 3 second me naye messages check karta hai (asli push notification Stage 3 me aayegi). */
-private const val POLL_MS = 3000L
+/** Jitna chhota, utni jaldi dono phones sync honge (asli push notification abhi nahi hai). */
+private const val POLL_MS = 1200L
 
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -32,7 +32,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var uploading by mutableStateOf(false)
         private set
-    private var lastId = 0L
+    private var lastSyncedAt: String? = null
     private var polling = false
     private var coupleId: String? = null
     private val urlsBeingFetched = mutableSetOf<Long>()
@@ -53,21 +53,26 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun poll() {
-        when (val r = api.fetchMessages(lastId)) {
+        when (val r = api.fetchMessages(lastSyncedAt)) {
             is Outcome.Ok -> {
-                if (r.value.isNotEmpty()) {
-                    // Status (ticks) update ho sakta hai purane messages ka bhi, isliye merge karo.
-                    r.value.forEach { incoming ->
-                        val idx = messages.indexOfFirst { it.id == incoming.id }
-                        if (idx >= 0) messages[idx] = incoming else messages.add(incoming)
-                    }
-                    lastId = r.value.maxOf { it.id }
+                r.value.forEach { incoming ->
+                    val idx = messages.indexOfFirst { it.id == incoming.id }
+                    if (idx >= 0) messages[idx] = incoming else messages.add(incoming)
                 }
-                if (messages.any { !it.fromMe }) api.markRead()
+                r.value.maxOfOrNull { it.updatedAt }?.let { latest ->
+                    if (lastSyncedAt == null || latest > lastSyncedAt!!) lastSyncedAt = latest
+                }
+                if (messages.any { !it.fromMe && !it.deleted }) api.markRead()
                 error = null
             }
             is Outcome.Err -> if (!r.offline) error = r.message
         }
+    }
+
+    private fun track(m: ChatMessage) {
+        val idx = messages.indexOfFirst { it.id == m.id }
+        if (idx >= 0) messages[idx] = m else messages.add(m)
+        if (lastSyncedAt == null || m.updatedAt > lastSyncedAt!!) lastSyncedAt = m.updatedAt
     }
 
     fun send(text: String) {
@@ -75,10 +80,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         if (body.isEmpty()) return
         viewModelScope.launch {
             when (val r = api.sendMessage("text", body)) {
-                is Outcome.Ok -> {
-                    messages.add(r.value)
-                    if (r.value.id > lastId) lastId = r.value.id
-                }
+                is Outcome.Ok -> track(r.value)
                 is Outcome.Err -> error = r.message
             }
         }
@@ -110,14 +112,38 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             when (val up = api.uploadMedia(path, bytes, mime)) {
                 is Outcome.Err -> error = up.message
                 is Outcome.Ok -> when (val sent = api.sendMessage(if (isVideo) "video" else "photo", path)) {
-                    is Outcome.Ok -> {
-                        messages.add(sent.value)
-                        if (sent.value.id > lastId) lastId = sent.value.id
-                    }
+                    is Outcome.Ok -> track(sent.value)
                     is Outcome.Err -> error = sent.message
                 }
             }
             uploading = false
+        }
+    }
+
+    /** "Delete for everyone" — apna hi message, dono phones se turant hat jaata hai. */
+    fun deleteMessage(id: Long) {
+        viewModelScope.launch {
+            when (val r = api.deleteMessage(id)) {
+                is Outcome.Ok -> {
+                    val idx = messages.indexOfFirst { it.id == id }
+                    if (idx >= 0) messages[idx] = messages[idx].copy(body = null, deleted = true)
+                }
+                is Outcome.Err -> error = r.message
+            }
+        }
+    }
+
+    /** Poori chat dono phones se clear kar deta hai. */
+    fun clearChat() {
+        viewModelScope.launch {
+            when (val r = api.clearChat()) {
+                is Outcome.Ok -> {
+                    messages.clear()
+                    signedUrls.clear()
+                    lastSyncedAt = null
+                }
+                is Outcome.Err -> error = r.message
+            }
         }
     }
 

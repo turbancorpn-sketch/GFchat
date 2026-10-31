@@ -34,7 +34,7 @@ import com.gfchat.app.ui.theme.ThemeMode
 import com.gfchat.app.ui.theme.ThemeStore
 
 /** Is naam ko apni girlfriend ke naam se badal do. */
-private const val PARTNER_NAME = "My Love"
+private const val PARTNER_NAME = "Closer"
 
 /** App background se itni der baad wapas aaye to dobara lock. (Photo picker ke liye chhoti grace.) */
 private const val RELOCK_AFTER_MS = 15_000L

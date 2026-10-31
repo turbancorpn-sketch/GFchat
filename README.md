@@ -28,16 +28,22 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 - Dikhane ke liye time-limited (1 ghanta) signed URL banta hai — file khud private rehti hai.
 - Photo seedha chat me dikhta hai; video pe tap karne se phone ke browser/player me khulta hai.
 
+**Stage 2D (delete + faster sync)**
+- Har 1.2 second me sync (pehle 3 second tha).
+- **Delete for everyone**: apna koi bhi message (text/photo/video) long-press karke delete kar sakte ho — dono phones se hat jaata hai, jagah pe "Ye message delete ho chuka hai" dikhta hai. Partner ka message tum delete nahi kar sakte.
+- **Chat clear karo**: top bar ke ⋮ menu se poori chat dono phones se ek saath clear ho jaati hai (koi confirm wapas nahi la sakta).
+- Bug fix: pehle ticks (delivered/read) sirf naye messages ke liye update hote the, purane message ki tick badalne pe sender ko pata nahi chalta tha. Ab sab sync hota hai.
+
 ## Abhi kya NAHI chalta (sach me)
 
-- Calls me awaaz aur video nahi jaati, sirf UI hai (Stage 3).
+- **Calls abhi sirf UI hain** — audio/video call screen khulti hai, timer chalta hai, par asli awaaz ya video kisi tak nahi jaati. Isko bananе ke liye WebRTC + ek signaling/TURN server chahiye, jo apne aap me ek bada, alag kaam hai.
 - Push notification nahi hai — message tabhi dikhega jab app khuli ho (poll-based). App band/background me ho to turant pata nahi chalega.
-- Stage 2A/2B/2C ka code Android Studio me compile ya asli Supabase ke saath test nahi kiya gaya. Pehli baar chalane pe chhoti errors aa sakti hain.
+- Stage 2A/2B/2C/2D ka code Android Studio me compile ya asli Supabase ke saath test nahi kiya gaya. Pehli baar chalane pe chhoti errors aa sakti hain.
 
 ## Setup (ek baar)
 
 1. [supabase.com](https://supabase.com) pe free project banao.
-2. Dashboard -> **SQL Editor** me `supabase/001_pairing.sql`, `supabase/002_app_config.sql`, `supabase/003_admin.sql`, `supabase/004_messages.sql`, `supabase/005_storage.sql` — paanchon ka poora content (alag-alag, isi order me) paste karke Run karo.
+2. Dashboard -> **SQL Editor** me `supabase/` folder ki saari files **number ke order me** (001 se 006 tak), ek-ek karke poora content paste karke Run karo.
 3. Dashboard -> **Authentication -> Sign In / Providers -> Email**: "Confirm email" band kar do (warna sign-up ke baad email link kholna padega; app dono sambhalti hai).
 4. `secrets.properties.example` ko `secrets.properties` naam se copy karo aur **Project Settings -> API** se `SUPABASE_URL` aur `SUPABASE_ANON_KEY` (anon/public key) daalo. Ye file git me nahi jaati. `service_role` key kabhi app me mat daalna.
 5. Android Studio me folder open karo, Gradle sync, phir phone/emulator pe Run (minSdk 26).
@@ -52,7 +58,7 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 
 ## Aage
 
-- **Stage 2D** – push notification (FCM) taaki background me bhi message mil jaye.
-- **Screen-share alert (Stage 2B)** – GFchat khula ho aur uski screen record/share ho rahi ho to dono phones pe warning dikhe aur partner ko red alert notification jaye. Dono ke liye same rule, aur jis phone pe detect hota hai wahan bhi bataya jata hai. Limit: sirf GFchat ke andar detect hota hai (Android 15+ pe screen-recording callback, Android 14 pe screenshot callback), poore phone ki screen share nahi pakad sakta.
+- **Stage 2E** – push notification (FCM) taaki background me bhi message mil jaye.
+- **Screen-share alert** – app khula ho aur uski screen record/share ho rahi ho to dono phones pe warning dikhe aur partner ko red alert notification jaye. Limit: sirf app ke andar detect hota hai, poore phone ki screen share nahi pakad sakta.
 - **Stage 3** – real audio + video call (WebRTC, signaling + TURN).
 - **Stage 4** – end-to-end encryption, voice messages, read receipts, Hindi polish.
