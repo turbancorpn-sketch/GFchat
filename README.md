@@ -20,7 +20,8 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 
 **Stage 2B (real text messaging)**
 - Text messages ab asli hain — Supabase `messages` table me save hote hain, sirf tumhare couple ke 2 accounts hi padh/likh sakte hain (RLS se enforce).
-- Har 3 second me naye messages check hote hain (`ChatViewModel.kt`, poll-based — asli push notification Stage 3 me).
+- Har 1.2 second me naye messages check hote hain (`ChatViewModel.kt`, poll-based — asli push notification Stage 2E me).
+- Naya message aane par notification tone (phone ki default notification sound) + halki vibration bajti hai — lekin sirf jab tak Chat screen khula ho.
 - **Ticks**: ek tick (sent), do gray tick (delivered — partner ke phone tak pahuncha), do blue tick (read — partner ne chat kholi).
 
 **Stage 2C (photo/video upload)**
@@ -37,7 +38,7 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 ## Abhi kya NAHI chalta (sach me)
 
 - **Calls abhi sirf UI hain** — audio/video call screen khulti hai, timer chalta hai, par asli awaaz ya video kisi tak nahi jaati. Isko bananе ke liye WebRTC + ek signaling/TURN server chahiye, jo apne aap me ek bada, alag kaam hai.
-- Push notification nahi hai — message tabhi dikhega jab app khuli ho (poll-based). App band/background me ho to turant pata nahi chalega.
+- Push notification nahi hai — message tabhi milega jab Chat screen khuli ho (poll-based + in-app tone). App band ho ya kisi aur screen pe ho to turant pata nahi chalega.
 - Stage 2A/2B/2C/2D ka code Android Studio me compile ya asli Supabase ke saath test nahi kiya gaya. Pehli baar chalane pe chhoti errors aa sakti hain.
 
 ## Setup (ek baar)

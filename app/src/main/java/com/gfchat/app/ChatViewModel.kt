@@ -13,6 +13,7 @@ import com.gfchat.app.data.ChatMessage
 import com.gfchat.app.data.Outcome
 import com.gfchat.app.data.SessionStore
 import com.gfchat.app.data.SupabaseApi
+import com.gfchat.app.util.NotificationSound
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -36,6 +37,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private var polling = false
     private var coupleId: String? = null
     private val urlsBeingFetched = mutableSetOf<Long>()
+    private var firstPollDone = false
 
     fun startPolling() {
         if (polling) return
@@ -53,16 +55,25 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun poll() {
+        val isFirstPoll = !firstPollDone
         when (val r = api.fetchMessages(lastSyncedAt)) {
             is Outcome.Ok -> {
+                var newIncoming = false
                 r.value.forEach { incoming ->
                     val idx = messages.indexOfFirst { it.id == incoming.id }
-                    if (idx >= 0) messages[idx] = incoming else messages.add(incoming)
+                    if (idx >= 0) {
+                        messages[idx] = incoming
+                    } else {
+                        messages.add(incoming)
+                        if (!isFirstPoll && !incoming.fromMe && !incoming.deleted) newIncoming = true
+                    }
                 }
                 r.value.maxOfOrNull { it.updatedAt }?.let { latest ->
                     if (lastSyncedAt == null || latest > lastSyncedAt!!) lastSyncedAt = latest
                 }
                 if (messages.any { !it.fromMe && !it.deleted }) api.markRead()
+                if (newIncoming) NotificationSound.play(getApplication())
+                firstPollDone = true
                 error = null
             }
             is Outcome.Err -> if (!r.offline) error = r.message
