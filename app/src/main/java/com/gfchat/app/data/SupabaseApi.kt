@@ -265,17 +265,49 @@ class SupabaseApi(private val session: SessionStore) {
         is Outcome.Ok -> Outcome.Ok(Unit)
     }
 
-    /** "Delete for everyone" — sirf apna hi message delete kar sakte ho. */
+    /** "Delete for everyone" — sirf apna hi message delete kar sakte ho. Agar photo/video
+     * thi to uski storage file bhi delete kar deta hai. */
     suspend fun deleteMessage(id: Long): Outcome<Unit> =
         when (val r = rpc("delete_message", JSONObject().put("message_id", id))) {
             is Outcome.Err -> r
-            is Outcome.Ok -> Outcome.Ok(Unit)
+            is Outcome.Ok -> {
+                val path = JSONObject(r.value).let { if (it.isNull("media_path")) null else it.optString("media_path") }
+                if (!path.isNullOrBlank()) deleteMediaObjects(listOf(path))
+                Outcome.Ok(Unit)
+            }
         }
 
-    /** Poori chat dono phones se clear kar deta hai. */
+    /** Poori chat dono phones se clear kar deta hai, saath me uski saari media files bhi. */
     suspend fun clearChat(): Outcome<Unit> = when (val r = rpc("clear_chat")) {
         is Outcome.Err -> r
-        is Outcome.Ok -> Outcome.Ok(Unit)
+        is Outcome.Ok -> {
+            val arr = JSONObject(r.value).optJSONArray("media_paths")
+            val paths = (0 until (arr?.length() ?: 0)).mapNotNull { arr?.optString(it) }
+            if (paths.isNotEmpty()) deleteMediaObjects(paths)
+            Outcome.Ok(Unit)
+        }
+    }
+
+    /** Storage API se "media" bucket ki files delete karta hai (RLS: sirf apni couple ki). */
+    private suspend fun deleteMediaObjects(paths: List<String>): Outcome<Unit> {
+        val token = when (val t = validToken()) {
+            is Outcome.Ok -> t.value
+            is Outcome.Err -> return t
+        }
+        return guard {
+            withContext(Dispatchers.IO) {
+                val req = Request.Builder()
+                    .url("$base/storage/v1/object/media")
+                    .header("apikey", anonKey)
+                    .header("Authorization", "Bearer $token")
+                    .delete(JSONObject().put("prefixes", JSONArray(paths)).toString().toRequestBody(json))
+                    .build()
+                http.newCall(req).execute().use { resp ->
+                    // Media delete best-effort hai — ismein fail hone se message delete nahi rukna chahiye.
+                    Outcome.Ok(Unit)
+                }
+            }
+        }
     }
 
     suspend fun myCoupleId(): Outcome<String> = when (val r = rpc("my_couple_id")) {

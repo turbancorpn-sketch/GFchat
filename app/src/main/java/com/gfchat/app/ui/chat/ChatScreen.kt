@@ -398,13 +398,19 @@ private fun BubbleFooter(m: ChatMessage) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
         Text(timeLabel(m.createdAt), style = MaterialTheme.typography.labelSmall)
         if (m.fromMe) {
-            Spacer(Modifier.width(4.dp))
-            val (icon, tint) = when (m.status) {
-                TickStatus.Sent -> Icons.Filled.Check to MaterialTheme.colorScheme.onSurfaceVariant
-                TickStatus.Delivered -> Icons.Filled.DoneAll to MaterialTheme.colorScheme.onSurfaceVariant
-                TickStatus.Read -> Icons.Filled.DoneAll to MaterialTheme.colorScheme.primary
+            val (icon, tint, label) = when (m.status) {
+                TickStatus.Sent -> Triple(Icons.Filled.Check, MaterialTheme.colorScheme.onSurfaceVariant, "Sent")
+                TickStatus.Delivered -> Triple(Icons.Filled.DoneAll, MaterialTheme.colorScheme.onSurfaceVariant, "Delivered")
+                TickStatus.Read -> Triple(Icons.Filled.DoneAll, MaterialTheme.colorScheme.primary, "Seen")
             }
-            Icon(icon, contentDescription = m.status.name, tint = tint, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = tint,
+            )
+            Spacer(Modifier.width(2.dp))
+            Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(14.dp))
         }
     }
 }
