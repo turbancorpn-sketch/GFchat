@@ -55,6 +55,11 @@ class SupabaseApi(private val session: SessionStore) {
 
     val configured: Boolean get() = base.startsWith("https://") && anonKey.isNotBlank()
 
+    /** Realtime (websocket) endpoint, instant tick/message push ke liye. */
+    val realtimeWsUrl: String
+        get() = base.replaceFirst("https://", "wss://").replaceFirst("http://", "ws://") + "/realtime/v1/websocket"
+    val publicAnonKey: String get() = anonKey
+
     private class Raw(val code: Int, val body: String)
 
     private suspend fun call(path: String, body: JSONObject, bearer: String? = null): Raw =
@@ -166,6 +171,9 @@ class SupabaseApi(private val session: SessionStore) {
             }
         }
     }
+
+    /** Realtime socket ke liye current (auto-refreshed) access token. */
+    suspend fun currentAccessToken(): String? = (validToken() as? Outcome.Ok)?.value
 
     private suspend fun rpc(fn: String, args: JSONObject = JSONObject()): Outcome<String> {
         val token = when (val t = validToken()) {

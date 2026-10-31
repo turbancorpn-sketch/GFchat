@@ -11,6 +11,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gfchat.app.data.ChatMessage
 import com.gfchat.app.data.Outcome
+import com.gfchat.app.data.RealtimeClient
 import com.gfchat.app.data.SessionStore
 import com.gfchat.app.data.SupabaseApi
 import com.gfchat.app.util.NotificationSound
@@ -20,8 +21,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-/** Jitna chhota, utni jaldi dono phones sync honge (asli push notification abhi nahi hai). */
-private const val POLL_MS = 1200L
+/** Safety-net poll interval — Realtime (websocket) ke saath zyada tar updates turant
+ * aa jaate hain, yeh sirf tab kaam aata hai jab socket na jud paaye. */
+private const val POLL_MS = 2500L
 
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -38,45 +40,64 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private var coupleId: String? = null
     private val urlsBeingFetched = mutableSetOf<Long>()
     private var firstPollDone = false
+    private var pollInFlight = false
+    private var realtime: RealtimeClient? = null
 
     fun startPolling() {
-        if (polling) return
-        polling = true
-        viewModelScope.launch {
-            while (polling) {
-                poll()
-                delay(POLL_MS)
+        if (!polling) {
+            polling = true
+            viewModelScope.launch {
+                while (polling) {
+                    poll()
+                    delay(POLL_MS)
+                }
             }
         }
+        if (realtime == null) {
+            realtime = RealtimeClient(
+                wsUrl = api.realtimeWsUrl,
+                anonKey = api.publicAnonKey,
+                tokenProvider = { api.currentAccessToken() },
+                onChange = { viewModelScope.launch { poll() } },
+            )
+        }
+        realtime?.start()
     }
 
     fun stopPolling() {
         polling = false
+        realtime?.stop()
     }
 
     private suspend fun poll() {
-        val isFirstPoll = !firstPollDone
-        when (val r = api.fetchMessages(lastSyncedAt)) {
-            is Outcome.Ok -> {
-                var newIncoming = false
-                r.value.forEach { incoming ->
-                    val idx = messages.indexOfFirst { it.id == incoming.id }
-                    if (idx >= 0) {
-                        messages[idx] = incoming
-                    } else {
-                        messages.add(incoming)
-                        if (!isFirstPoll && !incoming.fromMe && !incoming.deleted) newIncoming = true
+        if (pollInFlight) return
+        pollInFlight = true
+        try {
+            val isFirstPoll = !firstPollDone
+            when (val r = api.fetchMessages(lastSyncedAt)) {
+                is Outcome.Ok -> {
+                    var newIncoming = false
+                    r.value.forEach { incoming ->
+                        val idx = messages.indexOfFirst { it.id == incoming.id }
+                        if (idx >= 0) {
+                            messages[idx] = incoming
+                        } else {
+                            messages.add(incoming)
+                            if (!isFirstPoll && !incoming.fromMe && !incoming.deleted) newIncoming = true
+                        }
                     }
+                    r.value.maxOfOrNull { it.updatedAt }?.let { latest ->
+                        if (lastSyncedAt == null || latest > lastSyncedAt!!) lastSyncedAt = latest
+                    }
+                    if (messages.any { !it.fromMe && !it.deleted }) api.markRead()
+                    if (newIncoming) NotificationSound.play(getApplication())
+                    firstPollDone = true
+                    error = null
                 }
-                r.value.maxOfOrNull { it.updatedAt }?.let { latest ->
-                    if (lastSyncedAt == null || latest > lastSyncedAt!!) lastSyncedAt = latest
-                }
-                if (messages.any { !it.fromMe && !it.deleted }) api.markRead()
-                if (newIncoming) NotificationSound.play(getApplication())
-                firstPollDone = true
-                error = null
+                is Outcome.Err -> if (!r.offline) error = r.message
             }
-            is Outcome.Err -> if (!r.offline) error = r.message
+        } finally {
+            pollInFlight = false
         }
     }
 
