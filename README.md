@@ -21,7 +21,7 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 **Stage 2B (real text messaging)**
 - Text messages ab asli hain — Supabase `messages` table me save hote hain, sirf tumhare couple ke 2 accounts hi padh/likh sakte hain (RLS se enforce).
 - Supabase Realtime (websocket) se naye message/ticks turant push hote hain (`RealtimeClient.kt`); agar socket kabhi na jud paaye to har 2.5 second ka safety-net poll backup rehta hai (`ChatViewModel.kt`) — isliye kabhi bhi update miss nahi hoga.
-- Naya message aane par notification tone (phone ki default notification sound) + halki vibration bajti hai — lekin sirf jab tak Chat screen khula ho.
+- Naya message aane par notification tone + halki vibration bajti hai (sirf jab tak Chat screen khula ho). Tone change karne ke liye: Chat screen ke upar-right "⋮" menu -> "Notification tone badlo" (phone ki apni ringtone-picker khulti hai, koi bhi tone/silent chun sakte ho).
 - **Ticks**: ek tick (sent), do gray tick (delivered — partner ke phone tak pahuncha), do blue tick (read — partner ne chat kholi).
 
 **Stage 2C (photo/video upload)**

@@ -1,6 +1,7 @@
 package com.gfchat.app.ui.chat
 
 import android.content.Intent
+import android.media.RingtoneManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
@@ -68,6 +70,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.gfchat.app.util.NotificationPrefs
 import coil.compose.AsyncImage
 import com.gfchat.app.ChatViewModel
 import com.gfchat.app.data.ChatMessage
@@ -96,9 +99,15 @@ fun ChatScreen(
     onToggleTheme: () -> Unit,
 ) {
     val vm: ChatViewModel = viewModel()
+    val context = LocalContext.current
     DisposableEffect(Unit) {
         vm.startPolling()
         onDispose { vm.stopPolling() }
+    }
+
+    val tonePicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        NotificationPrefs.setToneUri(context, uri)
     }
 
     var draft by remember { mutableStateOf("") }
@@ -171,6 +180,28 @@ fun ChatScreen(
                             Icon(Icons.Filled.MoreVert, contentDescription = "Aur options")
                         }
                         DropdownMenu(expanded = overflowMenu, onDismissRequest = { overflowMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Notification tone badlo") },
+                                leadingIcon = { Icon(Icons.Filled.MusicNote, null) },
+                                onClick = {
+                                    overflowMenu = false
+                                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Notification tone chuno")
+                                        putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                        putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                                        putExtra(
+                                            RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                                            NotificationPrefs.getToneUri(context)
+                                                ?: RingtoneManager.getActualDefaultRingtoneUri(
+                                                    context,
+                                                    RingtoneManager.TYPE_NOTIFICATION,
+                                                ),
+                                        )
+                                    }
+                                    tonePicker.launch(intent)
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Chat clear karo") },
                                 leadingIcon = { Icon(Icons.Filled.DeleteSweep, null) },

@@ -15,7 +15,8 @@ object NotificationSound {
 
     fun play(context: Context) {
         runCatching {
-            val uri = RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_NOTIFICATION)
+            val uri = NotificationPrefs.getToneUri(context)
+                ?: RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_NOTIFICATION)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
             RingtoneManager.getRingtone(context, uri)?.play()
         }
