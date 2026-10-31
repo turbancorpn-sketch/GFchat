@@ -48,7 +48,7 @@ private fun Page(content: @Composable () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("Closer", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Text("Scooter", fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(24.dp))
         content()
     }

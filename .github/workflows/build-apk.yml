@@ -39,16 +39,16 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Closer-debug-apk
+          name: Scooter-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
 
-      # Phone se seedha download karne ke liye: Releases -> "latest" -> Closer.apk
+      # Phone se seedha download karne ke liye: Releases -> "latest" -> Scooter.apk
       - name: Publish APK to Releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Closer.apk
+          cp app/build/outputs/apk/debug/app-debug.apk Scooter.apk
           gh release delete latest --cleanup-tag -y || true
-          gh release create latest Closer.apk --prerelease \
-            --title "Closer latest build" \
+          gh release create latest Scooter.apk --prerelease \
+            --title "Scooter latest build" \
             --notes "Debug APK. Commit: ${{ github.sha }}"
