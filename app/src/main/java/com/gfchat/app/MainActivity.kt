@@ -1,21 +1,30 @@
 package com.gfchat.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.gfchat.app.call.CallState
+import com.gfchat.app.call.CallViewModel
 import com.gfchat.app.security.BiometricHelper
 import com.gfchat.app.security.PinStore
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -26,6 +35,7 @@ import com.gfchat.app.ui.auth.NotConfiguredScreen
 import com.gfchat.app.ui.auth.PairingScreen
 import com.gfchat.app.ui.auth.UpdateRequiredScreen
 import com.gfchat.app.ui.admin.AdminScreen
+import com.gfchat.app.ui.call.CallScreen
 import com.gfchat.app.ui.chat.ChatScreen
 import com.gfchat.app.ui.lock.LockScreen
 import com.gfchat.app.ui.theme.GFchatTheme
@@ -112,8 +122,24 @@ class MainActivity : FragmentActivity() {
                     onSignOut = vm::signOut,
                 )
                 AppScreen.Ready -> {
-                    if (showAdmin) {
-                        AdminScreen(
+                    val callVm: CallViewModel = viewModel()
+                    DisposableEffect(Unit) {
+                        callVm.startListening()
+                        onDispose { callVm.stopListening() }
+                    }
+                    val micPermission = rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestPermission(),
+                    ) { /* granted ya nahi — startCall/acceptCall apne aap try karte hain */ }
+                    LaunchedEffect(Unit) {
+                        if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO) !=
+                            PackageManager.PERMISSION_GRANTED
+                        ) {
+                            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }
+
+                    when {
+                        showAdmin -> AdminScreen(
                             config = vm.adminConfig,
                             busy = vm.busy,
                             error = vm.error,
@@ -122,13 +148,24 @@ class MainActivity : FragmentActivity() {
                             onSetMinVersion = vm::setMinVersion,
                             onBack = { showAdmin = false; vm.clearMessages() },
                         )
-                    } else {
-                        ChatScreen(
+                        callVm.state !is CallState.Idle -> CallScreen(vm = callVm, partnerName = PARTNER_NAME)
+                        else -> ChatScreen(
                             partnerName = PARTNER_NAME,
                             isAdmin = vm.isAdmin,
                             themeMode = themeMode,
                             onAdmin = { showAdmin = true },
                             onToggleTheme = onToggleTheme,
+                            onStartCall = {
+                                if (ContextCompat.checkSelfPermission(
+                                        this@MainActivity,
+                                        Manifest.permission.RECORD_AUDIO,
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    callVm.startCall()
+                                } else {
+                                    micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                                }
+                            },
                         )
                     }
                 }

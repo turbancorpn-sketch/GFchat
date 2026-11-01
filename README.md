@@ -37,7 +37,7 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 
 ## Abhi kya NAHI chalta (sach me)
 
-- **Audio/video call hata diya gaya hai** — pehle sirf UI demo tha (asli awaaz/video nahi jaata tha), isliye button hi hata diya taaki galatfehmi na ho. Real calling (WebRTC + signaling/TURN server) chahiye to Stage 3 me alag se banega.
+- **Real audio call** ab hai (WebRTC) — chat screen ke top bar se call icon se shuru hoti hai. Signaling Supabase Realtime se hoti hai (alag server nahi chahiye), aur NAT ke peeche se bhi connect ho sake isliye ek public demo TURN relay use ho raha hai abhi (apna TURN server baad me laga sakte hain, zyada reliable ho jayega). **Ye naya hai aur live do phone pe test nahi hua hai** — pehli baar me koi dikkat (ring na hona, aawaz na aana, connect na hona) aa sakti hai, bata dena turant theek karunga. Video call abhi nahi hai (audio stable hone ke baad add hoga).
 - Push notification nahi hai — message tabhi milega jab Chat screen khuli ho (poll-based + in-app tone). App band ho ya kisi aur screen pe ho to turant pata nahi chalega.
 - Stage 2A/2B/2C/2D ka code Android Studio me compile ya asli Supabase ke saath test nahi kiya gaya. Pehli baar chalane pe chhoti errors aa sakti hain.
 
@@ -61,5 +61,5 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 
 - **Stage 2E** – push notification (FCM) taaki background me bhi message mil jaye.
 - **Screen-share alert** – app khula ho aur uski screen record/share ho rahi ho to dono phones pe warning dikhe aur partner ko red alert notification jaye. Limit: sirf app ke andar detect hota hai, poore phone ki screen share nahi pakad sakta.
-- **Stage 3** – real audio + video call (WebRTC, signaling + TURN) — call button fir se add hoga jab yeh ready ho.
+- **Stage 3** – audio call shuru ho gaya hai; ab video call add karna, apna TURN server lagana (reliability ke liye), aur live testing ke baad jo bugs milein unhe theek karna baaki hai.
 - **Stage 4** – end-to-end encryption, voice messages, read receipts, Hindi polish.

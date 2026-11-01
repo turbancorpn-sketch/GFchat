@@ -57,6 +57,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             realtime = RealtimeClient(
                 wsUrl = api.realtimeWsUrl,
                 anonKey = api.publicAnonKey,
+                table = "messages",
                 tokenProvider = { api.currentAccessToken() },
                 onChange = { viewModelScope.launch { poll() } },
             )

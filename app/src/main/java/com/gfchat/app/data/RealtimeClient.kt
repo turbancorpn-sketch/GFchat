@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class RealtimeClient(
     private val wsUrl: String,
     private val anonKey: String,
+    private val table: String,
     private val tokenProvider: suspend () -> String?,
     private val onChange: () -> Unit,
 ) {
@@ -106,7 +107,7 @@ class RealtimeClient(
 
     private fun sendJoin(webSocket: WebSocket, token: String) {
         val join = JSONObject().apply {
-            put("topic", "realtime:public:messages")
+            put("topic", "realtime:public:$table")
             put("event", "phx_join")
             put(
                 "payload",
@@ -120,7 +121,7 @@ class RealtimeClient(
                                     JSONObject().apply {
                                         put("event", "*")
                                         put("schema", "public")
-                                        put("table", "messages")
+                                        put("table", table)
                                     },
                                 ),
                             )

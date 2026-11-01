@@ -35,6 +35,8 @@ data class ChatMessage(
     val deleted: Boolean,
 )
 
+data class CallSignal(val id: Long, val kind: String, val payload: String, val createdAt: String)
+
 sealed interface PairState {
     data object None : PairState
     data class Waiting(val code: String) : PairState
@@ -313,6 +315,29 @@ class SupabaseApi(private val session: SessionStore) {
     suspend fun myCoupleId(): Outcome<String> = when (val r = rpc("my_couple_id")) {
         is Outcome.Err -> r
         is Outcome.Ok -> Outcome.Ok(r.value.trim().trim('"'))
+    }
+
+    /** Call signaling: SDP offer/answer aur ICE candidates bhejta/sunta hai. */
+    suspend fun sendCallSignal(kind: String, payload: String): Outcome<Unit> =
+        when (val r = rpc("send_call_signal", JSONObject().put("kind", kind).put("payload", payload))) {
+            is Outcome.Err -> r
+            is Outcome.Ok -> Outcome.Ok(Unit)
+        }
+
+    suspend fun fetchCallSignals(since: String?): Outcome<List<CallSignal>> {
+        val args = JSONObject().put("since", since ?: JSONObject.NULL)
+        return when (val r = rpc("fetch_call_signals", args)) {
+            is Outcome.Err -> r
+            is Outcome.Ok -> {
+                val arr = JSONArray(r.value)
+                Outcome.Ok(
+                    (0 until arr.length()).map { i ->
+                        val o = arr.getJSONObject(i)
+                        CallSignal(o.getLong("id"), o.getString("kind"), o.getString("payload"), o.getString("created_at"))
+                    },
+                )
+            }
+        }
     }
 
     /** Private "media" bucket me upload karta hai. `path` = "{coupleId}/{filename}". */
