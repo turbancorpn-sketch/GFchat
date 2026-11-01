@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.gfchat.app.BuildConfig
 import com.gfchat.app.data.AppConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,6 +60,11 @@ fun AdminScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            Text(
+                "Is phone pe installed version: ${BuildConfig.VERSION_NAME} (code ${BuildConfig.VERSION_CODE})",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(16.dp))
             Text("Force update", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(4.dp))
             Text(
