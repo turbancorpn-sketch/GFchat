@@ -28,7 +28,22 @@ android {
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${secrets.getProperty("SUPABASE_ANON_KEY", "")}\"")
     }
 
+    // Fixed debug keystore (committed in repo) taaki har CI build me APK same key se sign ho —
+    // warna Gradle ka auto-generated debug keystore har fresh runner pe alag hota hai, aur phone
+    // purani app ke upar nayi APK install karne se mana kar deta hai ("package conflicts").
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
         }
