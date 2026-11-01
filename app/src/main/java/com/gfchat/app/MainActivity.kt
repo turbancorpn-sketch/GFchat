@@ -45,15 +45,11 @@ import com.gfchat.app.ui.theme.ThemeStore
 /** Is naam ko apni girlfriend ke naam se badal do. */
 private const val PARTNER_NAME = "Closer"
 
-/** App background se itni der baad wapas aaye to dobara lock. (Photo picker ke liye chhoti grace.) */
-private const val RELOCK_AFTER_MS = 15_000L
-
 class MainActivity : FragmentActivity() {
 
     private lateinit var pinStore: PinStore
     private lateinit var themeStore: ThemeStore
     private var locked by mutableStateOf(true)
-    private var stoppedAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,14 +73,10 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        stoppedAt = System.currentTimeMillis()
-    }
-
-    override fun onStart() {
-        super.onStart()
-        if (stoppedAt != 0L && System.currentTimeMillis() - stoppedAt > RELOCK_AFTER_MS) {
-            locked = true
-        }
+        // App minimize hote hi turant lock — photo/video picker khulne par bhi (wapas aane par
+        // fingerprint/PIN dobara dena padega). Agar yeh gallery pick karte waqt zyada tang kare,
+        // bata dena — chhoti grace period wapas laga denge.
+        locked = true
     }
 
     @Composable
