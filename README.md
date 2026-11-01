@@ -37,7 +37,7 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 
 ## Abhi kya NAHI chalta (sach me)
 
-- **Real audio call** ab hai (WebRTC) — chat screen ke top bar se call icon se shuru hoti hai. Signaling Supabase Realtime se hoti hai (alag server nahi chahiye), aur NAT ke peeche se bhi connect ho sake isliye ek public demo TURN relay use ho raha hai abhi (apna TURN server baad me laga sakte hain, zyada reliable ho jayega). **Ye naya hai aur live do phone pe test nahi hua hai** — pehli baar me koi dikkat (ring na hona, aawaz na aana, connect na hona) aa sakti hai, bata dena turant theek karunga. Video call abhi nahi hai (audio stable hone ke baad add hoga).
+- **Real audio aur video call** dono ab hai (WebRTC) — chat screen ke top bar me do icon hain: camera icon se video call, phone icon se audio call. Signaling Supabase Realtime se hoti hai (alag server nahi chahiye), aur NAT ke peeche se bhi connect ho sake isliye ek public demo TURN relay use ho raha hai abhi (apna TURN server baad me laga sakte hain, zyada reliable ho jayega). Incoming call pe phone ki ringtone bajti hai (vibration ke saath) jab tak accept/decline na ho, aur accept karna ab ek green slide-to-answer gesture se hota hai (WhatsApp jaisa — slide karke answer karo), decline tap se. Video call me apna chhota preview corner me dikhta hai aur partner ka video full-screen. **Ye sab naya hai aur live do phone pe test nahi hua hai** — pehli baar me koi dikkat (ring na hona, camera na khulna, aawaz/video na aana, connect na hona) aa sakti hai, bata dena turant theek karunga.
 - Push notification nahi hai — message tabhi milega jab Chat screen khuli ho (poll-based + in-app tone). App band ho ya kisi aur screen pe ho to turant pata nahi chalega.
 - Stage 2A/2B/2C/2D ka code Android Studio me compile ya asli Supabase ke saath test nahi kiya gaya. Pehli baar chalane pe chhoti errors aa sakti hain.
 
@@ -61,5 +61,5 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 
 - **Stage 2E** – push notification (FCM) taaki background me bhi message mil jaye.
 - **Screen-share alert** – app khula ho aur uski screen record/share ho rahi ho to dono phones pe warning dikhe aur partner ko red alert notification jaye. Limit: sirf app ke andar detect hota hai, poore phone ki screen share nahi pakad sakta.
-- **Stage 3** – audio call shuru ho gaya hai; ab video call add karna, apna TURN server lagana (reliability ke liye), aur live testing ke baad jo bugs milein unhe theek karna baaki hai.
+- **Stage 3** – audio aur video call, call ringtone, aur slide-to-answer shuru ho gaye hain; ab apna TURN server lagana (reliability ke liye) aur live testing ke baad jo bugs milein unhe theek karna baaki hai.
 - **Stage 4** – end-to-end encryption, voice messages, read receipts, Hindi polish.

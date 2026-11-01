@@ -19,19 +19,27 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONObject
 import org.webrtc.AudioSource
 import org.webrtc.AudioTrack
+import org.webrtc.Camera2Enumerator
+import org.webrtc.CameraVideoCapturer
 import org.webrtc.DataChannel
+import org.webrtc.DefaultVideoDecoderFactory
+import org.webrtc.DefaultVideoEncoderFactory
+import org.webrtc.EglBase
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStream
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.RtpReceiver
+import org.webrtc.RtpTransceiver
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
+import org.webrtc.SurfaceTextureHelper
+import org.webrtc.VideoSource
+import org.webrtc.VideoTrack
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** Abhi sirf audio call — video phase 2 me aayega (yahi state/signaling reuse hoga). */
 sealed interface CallState {
     data object Idle : CallState
     data class Outgoing(val video: Boolean) : CallState
@@ -52,8 +60,21 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var speakerOn by mutableStateOf(false)
         private set
+    var cameraOn by mutableStateOf(true)
+        private set
     var error by mutableStateOf<String?>(null)
         private set
+
+    /** UI (SurfaceViewRenderer) inhe bind karta hai jab bhi track milta/badalta hai. */
+    var localVideoTrack by mutableStateOf<VideoTrack?>(null)
+        private set
+    var remoteVideoTrack by mutableStateOf<VideoTrack?>(null)
+        private set
+
+    private val eglBase: EglBase by lazy { EglBase.create() }
+
+    /** CallScreen ke SurfaceViewRenderer.init() ke liye. */
+    val eglBaseContext: EglBase.Context get() = eglBase.eglBaseContext
 
     private var listening = false
     private var sinceTs: String? = null
@@ -64,6 +85,9 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
     private var peerConnection: PeerConnection? = null
     private var audioSource: AudioSource? = null
     private var localAudioTrack: AudioTrack? = null
+    private var videoSource: VideoSource? = null
+    private var videoCapturer: CameraVideoCapturer? = null
+    private var surfaceTextureHelper: SurfaceTextureHelper? = null
     private var offerSdp: String? = null
     private val pendingRemoteCandidates = mutableListOf<IceCandidate>()
     private var remoteDescriptionSet = false
@@ -161,7 +185,7 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             runCatching {
                 val pc = ensurePeerConnection()
-                attachLocalAudio(pc)
+                attachLocalMedia(pc, video)
                 val offer = pc.createOfferSuspend(MediaConstraints())
                 pc.setLocalDescriptionSuspend(offer)
                 api.sendCallSignal(
@@ -185,7 +209,7 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
                 pc.setRemoteDescriptionSuspend(SessionDescription(SessionDescription.Type.OFFER, offer))
                 remoteDescriptionSet = true
                 flushPendingCandidates()
-                attachLocalAudio(pc)
+                attachLocalMedia(pc, ringing.video)
                 val answer = pc.createAnswerSuspend(MediaConstraints())
                 pc.setLocalDescriptionSuspend(answer)
                 api.sendCallSignal("answer", JSONObject().put("sdp", answer.description).toString())
@@ -227,14 +251,22 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
         audioManager.isSpeakerphoneOn = speakerOn
     }
 
+    fun toggleCamera() {
+        cameraOn = !cameraOn
+        localVideoTrack?.setEnabled(cameraOn)
+    }
+
     private fun ensurePeerConnection(): PeerConnection {
         peerConnection?.let { return it }
         if (factory == null) {
+            val app = getApplication<Application>().applicationContext
             PeerConnectionFactory.initialize(
-                PeerConnectionFactory.InitializationOptions.builder(getApplication<Application>().applicationContext)
-                    .createInitializationOptions(),
+                PeerConnectionFactory.InitializationOptions.builder(app).createInitializationOptions(),
             )
-            factory = PeerConnectionFactory.builder().createPeerConnectionFactory()
+            factory = PeerConnectionFactory.builder()
+                .setVideoEncoderFactory(DefaultVideoEncoderFactory(eglBaseContext, true, true))
+                .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBaseContext))
+                .createPeerConnectionFactory()
         }
         val iceServers = listOf(
             PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
@@ -270,6 +302,11 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
 
+            override fun onTrack(transceiver: RtpTransceiver) {
+                val track = transceiver.receiver.track()
+                if (track is VideoTrack) remoteVideoTrack = track
+            }
+
             override fun onSignalingChange(p0: PeerConnection.SignalingState) {}
             override fun onIceConnectionReceivingChange(p0: Boolean) {}
             override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState) {}
@@ -284,15 +321,40 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
         return requireNotNull(pc)
     }
 
-    private fun attachLocalAudio(pc: PeerConnection) {
-        if (localAudioTrack != null) return
+    private fun attachLocalMedia(pc: PeerConnection, video: Boolean) {
+        if (localAudioTrack == null) {
+            val f = requireNotNull(factory)
+            val source = f.createAudioSource(MediaConstraints())
+            val track = f.createAudioTrack("audio0", source)
+            track.setEnabled(!muted)
+            pc.addTrack(track, listOf("gfchat-call"))
+            audioSource = source
+            localAudioTrack = track
+        }
+        if (video && localVideoTrack == null) {
+            runCatching { startCamera(pc) }.onFailure { error = "Camera shuru nahi ho paayi." }
+        }
+    }
+
+    private fun startCamera(pc: PeerConnection) {
+        val app = getApplication<Application>().applicationContext
         val f = requireNotNull(factory)
-        val source = f.createAudioSource(MediaConstraints())
-        val track = f.createAudioTrack("audio0", source)
-        track.setEnabled(!muted)
+        val enumerator = Camera2Enumerator(app)
+        val cameraName = enumerator.deviceNames.firstOrNull { enumerator.isFrontFacing(it) }
+            ?: enumerator.deviceNames.firstOrNull()
+            ?: return
+        val capturer = enumerator.createCapturer(cameraName, null) ?: return
+        val helper = SurfaceTextureHelper.create("gfchat-capture", eglBaseContext)
+        val source = f.createVideoSource(capturer.isScreencast)
+        capturer.initialize(helper, app, source.capturerObserver)
+        capturer.startCapture(640, 480, 24)
+        val track = f.createVideoTrack("video0", source)
+        track.setEnabled(cameraOn)
         pc.addTrack(track, listOf("gfchat-call"))
-        audioSource = source
-        localAudioTrack = track
+        videoCapturer = capturer
+        surfaceTextureHelper = helper
+        videoSource = source
+        localVideoTrack = track
     }
 
     private fun flushPendingCandidates() {
@@ -307,10 +369,21 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
         localAudioTrack = null
         runCatching { audioSource?.dispose() }
         audioSource = null
+        runCatching { videoCapturer?.stopCapture() }
+        runCatching { videoCapturer?.dispose() }
+        videoCapturer = null
+        runCatching { localVideoTrack?.dispose() }
+        localVideoTrack = null
+        runCatching { videoSource?.dispose() }
+        videoSource = null
+        runCatching { surfaceTextureHelper?.dispose() }
+        surfaceTextureHelper = null
+        remoteVideoTrack = null
         offerSdp = null
         remoteDescriptionSet = false
         pendingRemoteCandidates.clear()
         muted = false
+        cameraOn = true
         audioManager.mode = AudioManager.MODE_NORMAL
         audioManager.isSpeakerphoneOn = false
     }
@@ -321,6 +394,7 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
         cleanup()
         runCatching { factory?.dispose() }
         factory = null
+        runCatching { eglBase.release() }
     }
 }
 

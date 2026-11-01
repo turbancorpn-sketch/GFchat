@@ -81,7 +81,6 @@ class MainActivity : FragmentActivity() {
 
     @Composable
     private fun GFchatApp(themeMode: ThemeMode, onToggleTheme: () -> Unit) {
-        // null = call nahi chal rahi, true = video call, false = audio call
         var showAdmin by remember { mutableStateOf(false) }
         val vm: AuthViewModel = viewModel()
 
@@ -119,14 +118,14 @@ class MainActivity : FragmentActivity() {
                         callVm.startListening()
                         onDispose { callVm.stopListening() }
                     }
-                    val micPermission = rememberLauncherForActivityResult(
-                        ActivityResultContracts.RequestPermission(),
+                    val callPermissions = rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestMultiplePermissions(),
                     ) { /* granted ya nahi — startCall/acceptCall apne aap try karte hain */ }
+                    fun hasPermission(p: String) =
+                        ContextCompat.checkSelfPermission(this@MainActivity, p) == PackageManager.PERMISSION_GRANTED
                     LaunchedEffect(Unit) {
-                        if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO) !=
-                            PackageManager.PERMISSION_GRANTED
-                        ) {
-                            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                        if (!hasPermission(Manifest.permission.RECORD_AUDIO)) {
+                            callPermissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
                         }
                     }
 
@@ -148,14 +147,19 @@ class MainActivity : FragmentActivity() {
                             onAdmin = { showAdmin = true },
                             onToggleTheme = onToggleTheme,
                             onStartCall = {
-                                if (ContextCompat.checkSelfPermission(
-                                        this@MainActivity,
-                                        Manifest.permission.RECORD_AUDIO,
-                                    ) == PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    callVm.startCall()
+                                if (hasPermission(Manifest.permission.RECORD_AUDIO)) {
+                                    callVm.startCall(video = false)
                                 } else {
-                                    micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                                    callPermissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+                                }
+                            },
+                            onStartVideoCall = {
+                                if (hasPermission(Manifest.permission.RECORD_AUDIO) && hasPermission(Manifest.permission.CAMERA)) {
+                                    callVm.startCall(video = true)
+                                } else {
+                                    callPermissions.launch(
+                                        arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA),
+                                    )
                                 }
                             },
                         )

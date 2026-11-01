@@ -99,6 +99,7 @@ fun ChatScreen(
     onAdmin: () -> Unit,
     onToggleTheme: () -> Unit,
     onStartCall: () -> Unit,
+    onStartVideoCall: () -> Unit,
 ) {
     val vm: ChatViewModel = viewModel()
     val context = LocalContext.current
@@ -171,6 +172,9 @@ fun ChatScreen(
                             },
                             contentDescription = "Theme: $themeMode",
                         )
+                    }
+                    IconButton(onClick = onStartVideoCall) {
+                        Icon(Icons.Filled.Videocam, contentDescription = "Video call")
                     }
                     IconButton(onClick = onStartCall) {
                         Icon(Icons.Filled.Call, contentDescription = "Audio call")
