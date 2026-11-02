@@ -182,6 +182,7 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
     fun startCall(video: Boolean = false) {
         if (state !is CallState.Idle) return
         state = CallState.Outgoing(video)
+        if (video) speakerOn = true // video call me default speaker se aawaz aaye, earpiece se nahi
         viewModelScope.launch {
             runCatching {
                 val pc = ensurePeerConnection()
@@ -203,6 +204,7 @@ class CallViewModel(app: Application) : AndroidViewModel(app) {
     fun acceptCall() {
         val ringing = state as? CallState.Ringing ?: return
         val offer = offerSdp ?: return
+        if (ringing.video) speakerOn = true // video call me default speaker se aawaz aaye, earpiece se nahi
         viewModelScope.launch {
             runCatching {
                 val pc = ensurePeerConnection()

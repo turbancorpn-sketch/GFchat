@@ -260,14 +260,12 @@ private fun InCallControls(vm: CallViewModel, video: Boolean) {
         RoundButton(color = Color(0xFFE53935), onClick = vm::endCall) {
             Icon(Icons.Filled.CallEnd, contentDescription = "End call", tint = Color.White)
         }
-        if (!video) {
-            RoundButton(color = if (vm.speakerOn) Color.White else Color(0xFF3A3A3A), onClick = vm::toggleSpeaker) {
-                Icon(
-                    Icons.Filled.VolumeUp,
-                    contentDescription = "Speaker",
-                    tint = if (vm.speakerOn) Color.Black else Color.White,
-                )
-            }
+        RoundButton(color = if (vm.speakerOn) Color.White else Color(0xFF3A3A3A), onClick = vm::toggleSpeaker) {
+            Icon(
+                Icons.Filled.VolumeUp,
+                contentDescription = "Speaker",
+                tint = if (vm.speakerOn) Color.Black else Color.White,
+            )
         }
     }
 }
