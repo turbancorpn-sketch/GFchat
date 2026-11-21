@@ -290,6 +290,24 @@ class SupabaseApi(private val session: SessionStore) {
         }
     }
 
+    /** "Seen" ke 30 min baad auto-expire hui photo/video messages ki storage files clean karta hai.
+     * Server cron sirf DB row delete/mark karta hai (deleted_at), storage file delete seedha SQL se
+     * allowed nahi hai — isliye ye client periodically call karta hai (poll loop ke saath). */
+    suspend fun cleanupExpiredMedia() {
+        val r = rpc("fetch_media_cleanup")
+        val arr = (r as? Outcome.Ok)?.value?.let { runCatching { JSONArray(it) }.getOrNull() } ?: return
+        if (arr.length() == 0) return
+        val ids = mutableListOf<Long>()
+        val paths = mutableListOf<String>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            ids.add(o.getLong("id"))
+            paths.add(o.getString("media_path"))
+        }
+        if (paths.isNotEmpty()) deleteMediaObjects(paths)
+        rpc("ack_media_cleanup", JSONObject().put("ids", JSONArray(ids)))
+    }
+
     /** Storage API se "media" bucket ki files delete karta hai (RLS: sirf apni couple ki). */
     private suspend fun deleteMediaObjects(paths: List<String>): Outcome<Unit> {
         val token = when (val t = validToken()) {

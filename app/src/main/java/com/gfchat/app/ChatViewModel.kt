@@ -25,6 +25,10 @@ import java.util.UUID
  * aa jaate hain, yeh sirf tab kaam aata hai jab socket na jud paaye. */
 private const val POLL_MS = 2500L
 
+/** "Seen" ke 30 min baad auto-delete hui photo/video ki storage file clean karne ka interval —
+ * text messages turant (realtime/poll se) delete dikh jaate hain, ye sirf file cleanup ke liye hai. */
+private const val MEDIA_CLEANUP_MS = 60_000L
+
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     private val api = SupabaseApi(SessionStore(app))
@@ -50,6 +54,12 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 while (polling) {
                     poll()
                     delay(POLL_MS)
+                }
+            }
+            viewModelScope.launch {
+                while (polling) {
+                    runCatching { api.cleanupExpiredMedia() }
+                    delay(MEDIA_CLEANUP_MS)
                 }
             }
         }

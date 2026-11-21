@@ -34,6 +34,7 @@ Kotlin + Jetpack Compose + Material 3, backend Supabase.
 - **Delete for everyone**: apna koi bhi message (text/photo/video) long-press karke delete kar sakte ho — dono phones se hat jaata hai, jagah pe "Ye message delete ho chuka hai" dikhta hai. Partner ka message tum delete nahi kar sakte.
 - **Chat clear karo**: top bar ke ⋮ menu se poori chat dono phones se ek saath clear ho jaati hai (koi confirm wapas nahi la sakta).
 - Bug fix: pehle ticks (delivered/read) sirf naye messages ke liye update hote the, purane message ki tick badalne pe sender ko pata nahi chalta tha. Ab sab sync hota hai.
+- **Seen hone ke 30 min baad auto-delete**: koi bhi message jo "seen" ho chuka hai, seen hone ke 30 minute baad khud-ba-khud dono phones se delete ho jaata hai (server pe ek minute-by-minute cron job check karta hai) — jagah pe "Ye message delete ho chuka hai" dikhega, bilkul manual delete jaisa.
 
 ## Abhi kya NAHI chalta (sach me)
 
